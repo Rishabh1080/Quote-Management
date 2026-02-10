@@ -23,6 +23,7 @@ const statusBadge = (code: string) => {
 
 interface QuoteDetailsPageProps {
   onQuoteLoaded?: (status: string | null, quoteId: string | null) => void;
+  onReject?: () => void;
 }
 
 const QuoteDetails = ({ onQuoteLoaded }: QuoteDetailsPageProps) => {
@@ -93,11 +94,18 @@ const QuoteDetails = ({ onQuoteLoaded }: QuoteDetailsPageProps) => {
   return (
     <div className="container py-4">
       <div className="d-flex justify-content-between align-items-start mb-3">
-        <div>
-          <h4 className="mb-1">{quote.companies?.name}</h4>
-          <p className="text-muted mb-0">{quote.version_label} · {statusBadge(quote.status_code)}</p>
+        <div className="d-flex align-items-start gap-3">
+          <Link to="/quotes" className="btn btn-outline-secondary btn-sm mt-1">← Back</Link>
+          <div>
+            <h4 className="mb-1">{quote.companies?.name}</h4>
+            <p className="text-muted mb-0">{quote.version_label} · {statusBadge(quote.status_code)}</p>
+          </div>
         </div>
-        <Link to="/quotes" className="btn btn-outline-secondary btn-sm">← Back</Link>
+        <div className="d-flex gap-2">
+          <button className="btn btn-outline-dark btn-sm" disabled onClick={() => toast.info("Coming soon")}>
+            Export as PDF
+          </button>
+        </div>
       </div>
 
       {isApproved && (
@@ -113,11 +121,7 @@ const QuoteDetails = ({ onQuoteLoaded }: QuoteDetailsPageProps) => {
           <div className="card mb-3">
             <div className="card-body">
               <p><strong>Company:</strong> {quote.companies?.name}</p>
-              <p><strong>Product:</strong> {quote.products?.name}</p>
-              <p><strong>Base Price:</strong> {fmt(quote.products?.base_price || 0)}</p>
-              <p><strong>Status:</strong> {statusBadge(quote.status_code)}</p>
-              <p><strong>Version:</strong> {quote.version_label}</p>
-              <p className="mb-0"><strong>Discount:</strong> {quote.discount_percent}%</p>
+              <p className="mb-0"><strong>Product:</strong> {quote.products?.name}</p>
             </div>
           </div>
 
@@ -163,20 +167,6 @@ const QuoteDetails = ({ onQuoteLoaded }: QuoteDetailsPageProps) => {
             </div>
           </div>
 
-          <div className="d-flex gap-2">
-            {!isApproved && (
-              <button
-                className="btn btn-outline-danger btn-sm"
-                disabled={quote.status_code !== "PENDING_APPROVAL"}
-                onClick={handleReject}
-              >
-                Reject
-              </button>
-            )}
-            <button className="btn btn-outline-dark btn-sm" disabled onClick={() => toast.info("Coming soon")}>
-              Export as PDF
-            </button>
-          </div>
           </>
           )}
         </div>
