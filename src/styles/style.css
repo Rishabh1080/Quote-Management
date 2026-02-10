@@ -1,0 +1,53 @@
+/* Quote Mng - Custom Styles */
+
+body {
+  font-family: 'Inter', sans-serif !important;
+}
+
+.navbar-brand {
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.badge-DRAFT {
+  background-color: #6c757d !important;
+}
+.badge-PENDING_APPROVAL {
+  background-color: #fd7e14 !important;
+}
+.badge-APPROVED {
+  background-color: #198754 !important;
+}
+.badge-REJECTED {
+  background-color: #dc3545 !important;
+}
+
+.calc-card {
+  position: sticky;
+  top: 80px;
+}
+
+.version-history-item {
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.version-history-item:hover {
+  background-color: #f8f9fa;
+}
+
+.table th {
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6c757d;
+}
+
+.quote-readonly-notice {
+  background-color: #d1e7dd;
+  border: 1px solid #badbcc;
+  border-radius: 0.375rem;
+  padding: 0.75rem 1rem;
+  color: #0f5132;
+  font-weight: 500;
+}
