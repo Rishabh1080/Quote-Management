@@ -33,8 +33,21 @@ const QuoteDetails = ({ onQuoteLoaded }: QuoteDetailsPageProps) => {
   const [versions, setVersions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const load = async () => {
-    setLoading(true);
+  const [contentLoading, setContentLoading] = useState(false);
+
+  const loadVersions = async (groupId: string) => {
+    const { data: vers } = await supabase
+      .from("quotes")
+      .select("id, version_label, status_code, net_total, updated_at")
+      .eq("quote_group_id", groupId)
+      .order("version_number", { ascending: false });
+    setVersions(vers || []);
+  };
+
+  const loadContent = async (isInitial: boolean) => {
+    if (isInitial) setLoading(true);
+    else setContentLoading(true);
+
     const { data: q } = await supabase
       .from("quotes")
       .select("*, companies(name), products(name, base_price)")
@@ -51,18 +64,16 @@ const QuoteDetails = ({ onQuoteLoaded }: QuoteDetailsPageProps) => {
         .order("sort_order");
       setLineItems(items || []);
 
-      const { data: vers } = await supabase
-        .from("quotes")
-        .select("id, version_label, status_code, net_total, updated_at")
-        .eq("quote_group_id", q.quote_group_id)
-        .order("version_number", { ascending: false });
-      setVersions(vers || []);
+      if (isInitial) await loadVersions(q.quote_group_id);
     }
     setLoading(false);
+    setContentLoading(false);
   };
 
+  const isInitialLoad = !quote;
+
   useEffect(() => {
-    load();
+    loadContent(isInitialLoad);
     return () => onQuoteLoaded?.(null, null);
   }, [id]);
 
@@ -70,7 +81,8 @@ const QuoteDetails = ({ onQuoteLoaded }: QuoteDetailsPageProps) => {
     if (quote.status_code !== "PENDING_APPROVAL") return;
     await supabase.from("quotes").update({ status_code: "REJECTED" }).eq("id", quote.id);
     toast.success("Quote rejected");
-    load();
+    loadContent(false);
+    loadVersions(quote.quote_group_id);
   };
 
   if (loading) return <div className="container py-4"><p>Loading...</p></div>;
@@ -94,10 +106,18 @@ const QuoteDetails = ({ onQuoteLoaded }: QuoteDetailsPageProps) => {
 
       <div className="row g-4">
         <div className="col-lg-7">
+          {contentLoading ? (
+            <div className="text-center py-5"><div className="spinner-border text-secondary" role="status"><span className="visually-hidden">Loading...</span></div></div>
+          ) : (
+          <>
           <div className="card mb-3">
             <div className="card-body">
+              <p><strong>Company:</strong> {quote.companies?.name}</p>
               <p><strong>Product:</strong> {quote.products?.name}</p>
-              <p><strong>Discount:</strong> {quote.discount_percent}%</p>
+              <p><strong>Base Price:</strong> {fmt(quote.products?.base_price || 0)}</p>
+              <p><strong>Status:</strong> {statusBadge(quote.status_code)}</p>
+              <p><strong>Version:</strong> {quote.version_label}</p>
+              <p className="mb-0"><strong>Discount:</strong> {quote.discount_percent}%</p>
             </div>
           </div>
 
@@ -145,11 +165,6 @@ const QuoteDetails = ({ onQuoteLoaded }: QuoteDetailsPageProps) => {
 
           <div className="d-flex gap-2">
             {!isApproved && (
-              <Link to={`/quotes/${quote.id}/new-version`} className="btn btn-outline-primary btn-sm">
-                Create New Version
-              </Link>
-            )}
-            {!isApproved && (
               <button
                 className="btn btn-outline-danger btn-sm"
                 disabled={quote.status_code !== "PENDING_APPROVAL"}
@@ -162,26 +177,48 @@ const QuoteDetails = ({ onQuoteLoaded }: QuoteDetailsPageProps) => {
               Export as PDF
             </button>
           </div>
+          </>
+          )}
         </div>
 
         <div className="col-lg-5">
           <div className="card">
-            <div className="card-header fw-semibold">Version History</div>
+            <div className="card-header fw-semibold d-flex justify-content-between align-items-center">
+              Version History
+              {!isApproved && (
+                <Link to={`/quotes/${quote.id}/new-version`} className="btn btn-outline-primary btn-sm">
+                  + New Version
+                </Link>
+              )}
+            </div>
             <div className="list-group list-group-flush">
               {versions.map((v) => (
-                <Link
-                  key={v.id}
-                  to={`/quotes/${v.id}`}
-                  className={`list-group-item list-group-item-action version-history-item ${v.id === quote.id ? "active" : ""}`}
-                >
-                  <div className="d-flex justify-content-between">
-                    <span>{v.version_label}</span>
-                    {statusBadge(v.status_code)}
+                v.id === quote.id ? (
+                  <div
+                    key={v.id}
+                    className="list-group-item active"
+                  >
+                    <div className="d-flex justify-content-between">
+                      <span>{v.version_label}</span>
+                      {statusBadge(v.status_code)}
+                    </div>
+                    <small>{fmt(v.net_total)} · {new Date(v.updated_at).toLocaleDateString()}</small>
                   </div>
-                  <small className={v.id === quote.id ? "" : "text-muted"}>
-                    {fmt(v.net_total)} · {new Date(v.updated_at).toLocaleDateString()}
-                  </small>
-                </Link>
+                ) : (
+                  <Link
+                    key={v.id}
+                    to={`/quotes/${v.id}`}
+                    className="list-group-item list-group-item-action version-history-item"
+                  >
+                    <div className="d-flex justify-content-between">
+                      <span>{v.version_label}</span>
+                      {statusBadge(v.status_code)}
+                    </div>
+                    <small className="text-muted">
+                      {fmt(v.net_total)} · {new Date(v.updated_at).toLocaleDateString()}
+                    </small>
+                  </Link>
+                )
               ))}
             </div>
           </div>
