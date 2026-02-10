@@ -8,8 +8,8 @@ interface AdditionalRow {
   code: string;
   label: string;
   description: string;
-  quantity: number;
-  unit_price: number;
+  quantity: number | string;
+  unit_price: number | string;
 }
 
 interface QuoteFormProps {
@@ -18,6 +18,7 @@ interface QuoteFormProps {
     product_id: string;
     discount_percent: number;
     additionalItems: AdditionalRow[];
+    costDefaults?: Record<string, string>;
   };
   quoteGroupId?: string;
   sourceQuoteId?: string;
@@ -32,10 +33,13 @@ const QuoteForm = ({ prefill, quoteGroupId, renderActions }: QuoteFormProps) => 
 
   const [companyId, setCompanyId] = useState(prefill?.company_id || "");
   const [productId, setProductId] = useState(prefill?.product_id || "");
-  const [discountPercent, setDiscountPercent] = useState(prefill?.discount_percent || 0);
+  const [discountPercent, setDiscountPercent] = useState<number | string>(prefill?.discount_percent ?? "");
   const [additionalItems, setAdditionalItems] = useState<AdditionalRow[]>(prefill?.additionalItems || []);
   const [saving, setSaving] = useState(false);
-  const [costDefaults, setCostDefaults] = useState<Record<string, string>>({});
+  const [costDefaults, setCostDefaults] = useState<Record<string, string>>(prefill?.costDefaults || {});
+  const [costDefaultsErrors, setCostDefaultsErrors] = useState<Record<string, boolean>>({});
+  const [expenseErrors, setExpenseErrors] = useState<Record<number, { quantity?: boolean; unit_price?: boolean }>>({});
+  const [discountError, setDiscountError] = useState(false);
 
   const selectedProduct = products.find((p) => p.id === productId);
 
@@ -53,6 +57,13 @@ const QuoteForm = ({ prefill, quoteGroupId, renderActions }: QuoteFormProps) => 
     load();
   }, []);
 
+  // Clear discount error when user types
+  useEffect(() => {
+    if (discountPercent !== "" && !isNaN(Number(discountPercent))) {
+      setDiscountError(false);
+    }
+  }, [discountPercent]);
+
   const calcLineItems = () => {
     const lines: any[] = [];
     if (selectedProduct) {
@@ -66,29 +77,64 @@ const QuoteForm = ({ prefill, quoteGroupId, renderActions }: QuoteFormProps) => 
       });
     }
     additionalItems.forEach((item, i) => {
+      let unitPrice = Number(item.unit_price) || 0;
+      const quantity = Number(item.quantity) || 0;
+      
+      // Special calculation for STAY_MAN_DAYS
+      if (item.code === 'STAY_MAN_DAYS') {
+        const manDaysCost = Number(costDefaults['MAN_DAYS']) || 0;
+        const stayManDaysCost = Number(costDefaults['STAY_MAN_DAYS']) || 0;
+        unitPrice = manDaysCost + stayManDaysCost;
+      }
+      
       lines.push({
         item_type: item.code,
         label: item.label,
-        quantity: item.quantity,
-        unit_price: Number(item.unit_price),
-        line_total: item.quantity * Number(item.unit_price),
+        description: item.description || "",
+        quantity: quantity,
+        unit_price: unitPrice,
+        line_total: quantity * unitPrice,
         sort_order: i + 1,
       });
     });
     return lines;
   };
 
-  const allDefaultsFilled = costMaster.length > 0 && costMaster.every((c) => {
+  const allDefaultsFilled = costMaster.filter(c => c.code !== 'FIXED').length > 0 && costMaster.filter(c => c.code !== 'FIXED').every((c) => {
     const val = costDefaults[c.code];
     return val !== undefined && val !== "" && !isNaN(Number(val));
   });
 
+  const validateCostDefault = (code: string) => {
+    const val = costDefaults[code];
+    if (!val || val === "" || isNaN(Number(val))) {
+      setCostDefaultsErrors({ ...costDefaultsErrors, [code]: true });
+    }
+  };
+
   const addRow = () => {
-    if (!allDefaultsFilled) return;
-    const first = costMaster[0];
-    if (!first) return;
-    const unitPrice = Number(costDefaults[first.code]) || Number(first.default_unit_price);
-    setAdditionalItems([...additionalItems, { code: first.code, label: first.label, description: "", quantity: 1, unit_price: unitPrice }]);
+    // Check if all defaults are filled
+    if (!allDefaultsFilled) {
+      // Mark empty fields as errors
+      const errors: Record<string, boolean> = {};
+      costMaster.filter(c => c.code !== 'FIXED').forEach((c) => {
+        const val = costDefaults[c.code];
+        if (!val || val === "" || isNaN(Number(val))) {
+          errors[c.code] = true;
+        }
+      });
+      setCostDefaultsErrors(errors);
+      return;
+    }
+    
+    // Clear any errors
+    setCostDefaultsErrors({});
+    
+    // Default to FIXED type with empty values
+    const fixedCost = costMaster.find((c) => c.code === 'FIXED');
+    if (!fixedCost) return;
+    const unitPrice = costDefaults['FIXED'] || "";
+    setAdditionalItems([...additionalItems, { code: 'FIXED', label: fixedCost.label, description: "", quantity: "", unit_price: unitPrice }]);
   };
 
   const updateRow = (index: number, field: string, value: any) => {
@@ -96,19 +142,79 @@ const QuoteForm = ({ prefill, quoteGroupId, renderActions }: QuoteFormProps) => 
     if (field === "code") {
       const master = costMaster.find((c) => c.code === value);
       if (master) {
-        const unitPrice = Number(costDefaults[value]) || Number(master.default_unit_price);
+        let unitPrice: number | string = "";
+        
+        // Get unit price from costDefaults based on type
+        if (value === 'FIXED') {
+          unitPrice = costDefaults['FIXED'] || "";
+        } else if (value === 'MAN_DAYS') {
+          unitPrice = Number(costDefaults['MAN_DAYS']) || 0;
+        } else if (value === 'STAY_MAN_DAYS') {
+          // Special calculation for STAY_MAN_DAYS: unit_price = man_days + stay_man_days
+          const manDaysCost = Number(costDefaults['MAN_DAYS']) || 0;
+          const stayManDaysCost = Number(costDefaults['STAY_MAN_DAYS']) || 0;
+          unitPrice = manDaysCost + stayManDaysCost;
+        }
+        
         copy[index] = { ...copy[index], code: value, label: master.label, unit_price: unitPrice };
       }
     } else if (field === "description") {
       copy[index] = { ...copy[index], description: value };
     } else if (field === "quantity") {
-      let q = parseInt(value) || 0;
-      if (q < 1) q = 1;
-      copy[index] = { ...copy[index], quantity: q };
+      copy[index] = { ...copy[index], quantity: value };
+      // Clear error when user types
+      if (expenseErrors[index]?.quantity) {
+        const errors = { ...expenseErrors };
+        if (errors[index]) {
+          delete errors[index].quantity;
+          if (Object.keys(errors[index]).length === 0) delete errors[index];
+        }
+        setExpenseErrors(errors);
+      }
     } else if (field === "unit_price") {
-      copy[index] = { ...copy[index], unit_price: Number(value) || 0 };
+      // Only allow editing unit_price for FIXED type
+      if (copy[index].code === 'FIXED') {
+        copy[index] = { ...copy[index], unit_price: value };
+        // Clear error when user types
+        if (expenseErrors[index]?.unit_price) {
+          const errors = { ...expenseErrors };
+          if (errors[index]) {
+            delete errors[index].unit_price;
+            if (Object.keys(errors[index]).length === 0) delete errors[index];
+          }
+          setExpenseErrors(errors);
+        }
+      }
     }
     setAdditionalItems(copy);
+  };
+
+  const validateExpenseField = (index: number, field: 'quantity' | 'unit_price') => {
+    const item = additionalItems[index];
+    const errors = { ...expenseErrors };
+    
+    if (field === 'quantity') {
+      const qty = Number(item.quantity);
+      if (!item.quantity || item.quantity === "" || isNaN(qty) || qty < 1) {
+        if (!errors[index]) errors[index] = {};
+        errors[index].quantity = true;
+      }
+    } else if (field === 'unit_price' && item.code === 'FIXED') {
+      const cost = Number(item.unit_price);
+      if (!item.unit_price || item.unit_price === "" || isNaN(cost) || cost <= 0) {
+        if (!errors[index]) errors[index] = {};
+        errors[index].unit_price = true;
+      }
+    }
+    
+    setExpenseErrors(errors);
+  };
+
+  const validateDiscount = () => {
+    const discount = Number(discountPercent);
+    if (discountPercent === "" || discountPercent === null || discountPercent === undefined || isNaN(discount)) {
+      setDiscountError(true);
+    }
   };
 
   const removeRow = (index: number) => {
@@ -120,6 +226,38 @@ const QuoteForm = ({ prefill, quoteGroupId, renderActions }: QuoteFormProps) => 
       toast.error("Company and Product are required");
       return;
     }
+    
+    // Validate that mandatory costs are filled
+    if (!costDefaults['MAN_DAYS'] || !costDefaults['STAY_MAN_DAYS']) {
+      toast.error("Man days and Stay costs are required");
+      return;
+    }
+    
+    // Validate discount is filled (can be 0 but must be a number)
+    if (discountPercent === "" || discountPercent === null || discountPercent === undefined || isNaN(Number(discountPercent))) {
+      toast.error("Discount percentage is required");
+      return;
+    }
+    
+    // For "Submit for Approval", validate all expense items have quantity and cost
+    if (statusCode === 'PENDING_APPROVAL') {
+      for (let i = 0; i < additionalItems.length; i++) {
+        const item = additionalItems[i];
+        const qty = Number(item.quantity);
+        if (!item.quantity || item.quantity === "" || isNaN(qty) || qty < 1) {
+          toast.error(`Expense item ${i + 1}: Quantity is required`);
+          return;
+        }
+        if (item.code === 'FIXED') {
+          const cost = Number(item.unit_price);
+          if (!item.unit_price || item.unit_price === "" || isNaN(cost) || cost <= 0) {
+            toast.error(`Expense item ${i + 1}: Cost is required for Fixed items`);
+            return;
+          }
+        }
+      }
+    }
+    
     setSaving(true);
     try {
       const lines = calcLineItems();
@@ -161,9 +299,12 @@ const QuoteForm = ({ prefill, quoteGroupId, renderActions }: QuoteFormProps) => 
           status_code: statusCode,
           company_id: companyId,
           product_id: productId,
-          discount_percent: discountPercent,
+          discount_percent: Number(discountPercent),
           subtotal,
           net_total: netTotal,
+          fixed_cost: costDefaults['FIXED'] ? Number(costDefaults['FIXED']) : null,
+          man_days_cost: Number(costDefaults['MAN_DAYS']),
+          stay_man_days_cost: Number(costDefaults['STAY_MAN_DAYS']),
         })
         .select()
         .single();
@@ -185,13 +326,26 @@ const QuoteForm = ({ prefill, quoteGroupId, renderActions }: QuoteFormProps) => 
   };
 
   const calcAdditionalForPanel = () =>
-    additionalItems.map((item) => ({
-      label: item.label,
-      quantity: item.quantity,
-      unit_price: item.unit_price,
-      line_total: item.quantity * item.unit_price,
-      item_type: item.code,
-    }));
+    additionalItems.map((item) => {
+      let unitPrice = Number(item.unit_price) || 0;
+      const quantity = Number(item.quantity) || 0;
+      
+      // Special calculation for STAY_MAN_DAYS
+      if (item.code === 'STAY_MAN_DAYS') {
+        const manDaysCost = Number(costDefaults['MAN_DAYS']) || 0;
+        const stayManDaysCost = Number(costDefaults['STAY_MAN_DAYS']) || 0;
+        unitPrice = manDaysCost + stayManDaysCost;
+      }
+      
+      return {
+        label: item.label,
+        description: item.description,
+        quantity: quantity,
+        unit_price: unitPrice,
+        line_total: quantity * unitPrice,
+        item_type: item.code,
+      };
+    });
 
   return (
     <>
@@ -229,20 +383,27 @@ const QuoteForm = ({ prefill, quoteGroupId, renderActions }: QuoteFormProps) => 
             )}
 
             {/* Cost Defaults */}
-            {costMaster.length > 0 && (
+            {costMaster.filter(c => c.code !== 'FIXED').length > 0 && (
               <div className="card bg-light mb-3">
                 <div className="card-body py-2">
                   <label className="form-label mb-2 fw-semibold" style={{ fontSize: "0.85rem" }}>Set Default Costs</label>
                   <div className="row g-2">
-                    {costMaster.map((c) => (
+                    {costMaster.filter(c => c.code !== 'FIXED').map((c) => (
                       <div key={c.code} className="col-sm-4">
                         <label className="form-label mb-1" style={{ fontSize: "0.8rem" }}>{c.label}</label>
                         <input
-                          type="number"
-                          className="form-control form-control-sm"
-                          placeholder={`₹ ${c.default_unit_price}`}
+                          type="text"
+                          className={`form-control form-control-sm ${costDefaultsErrors[c.code] ? 'is-invalid' : ''}`}
                           value={costDefaults[c.code] ?? ""}
-                          onChange={(e) => setCostDefaults({ ...costDefaults, [c.code]: e.target.value })}
+                          inputMode="numeric"
+                          onChange={(e) => {
+                            setCostDefaults({ ...costDefaults, [c.code]: e.target.value });
+                            // Clear error when user starts typing
+                            if (costDefaultsErrors[c.code]) {
+                              setCostDefaultsErrors({ ...costDefaultsErrors, [c.code]: false });
+                            }
+                          }}
+                          onBlur={() => validateCostDefault(c.code)}
                         />
                       </div>
                     ))}
@@ -259,8 +420,6 @@ const QuoteForm = ({ prefill, quoteGroupId, renderActions }: QuoteFormProps) => 
                   className="btn btn-outline-primary btn-sm"
                   type="button"
                   onClick={addRow}
-                  disabled={!allDefaultsFilled}
-                  title={!allDefaultsFilled ? "Please fill all default costs first" : ""}
                 >
                   + Add expense
                 </button>
@@ -274,7 +433,19 @@ const QuoteForm = ({ prefill, quoteGroupId, renderActions }: QuoteFormProps) => 
                   <div className="col-sm-2"></div>
                 </div>
               )}
-              {additionalItems.map((item, i) => (
+              {additionalItems.map((item, i) => {
+                // Calculate display unit price for STAY_MAN_DAYS
+                let displayUnitPrice: number | string = item.unit_price;
+                if (item.code === 'STAY_MAN_DAYS') {
+                  const manDaysCost = Number(costDefaults['MAN_DAYS']) || 0;
+                  const stayManDaysCost = Number(costDefaults['STAY_MAN_DAYS']) || 0;
+                  displayUnitPrice = manDaysCost + stayManDaysCost;
+                }
+                
+                // Only FIXED type can edit unit price
+                const isUnitPriceEditable = item.code === 'FIXED';
+                
+                return (
                 <div key={i} className="row g-2 mb-2 align-items-end">
                   <div className="col-sm-3">
                     <select className="form-select form-select-sm" value={item.code} onChange={(e) => updateRow(i, "code", e.target.value)}>
@@ -284,19 +455,36 @@ const QuoteForm = ({ prefill, quoteGroupId, renderActions }: QuoteFormProps) => 
                     </select>
                   </div>
                   <div className="col-sm-3">
-                    <input type="text" className="form-control form-control-sm" placeholder="Description" value={item.description} onChange={(e) => updateRow(i, "description", e.target.value)} />
+                    <input type="text" className="form-control form-control-sm" value={item.description} onChange={(e) => updateRow(i, "description", e.target.value)} />
                   </div>
                   <div className="col-sm-2">
-                    <input type="number" className="form-control form-control-sm" placeholder="Qty" value={item.quantity} min={1} onChange={(e) => updateRow(i, "quantity", e.target.value)} />
+                    <input 
+                      type="text" 
+                      className={`form-control form-control-sm ${expenseErrors[i]?.quantity ? 'is-invalid' : ''}`}
+                      value={item.quantity} 
+                      onChange={(e) => updateRow(i, "quantity", e.target.value)}
+                      onBlur={() => validateExpenseField(i, 'quantity')}
+                      inputMode="numeric"
+                    />
                   </div>
                   <div className="col-sm-2">
-                    <input type="number" className="form-control form-control-sm" placeholder="Unit price" value={item.unit_price} onChange={(e) => updateRow(i, "unit_price", e.target.value)} />
+                    <input 
+                      type="text" 
+                      className={`form-control form-control-sm ${expenseErrors[i]?.unit_price ? 'is-invalid' : ''}`}
+                      value={displayUnitPrice} 
+                      onChange={(e) => updateRow(i, "unit_price", e.target.value)}
+                      onBlur={() => validateExpenseField(i, 'unit_price')}
+                      readOnly={!isUnitPriceEditable}
+                      disabled={!isUnitPriceEditable}
+                      inputMode="numeric"
+                    />
                   </div>
                   <div className="col-sm-2">
                     <button className="btn btn-outline-danger btn-sm w-100" onClick={() => removeRow(i)}>✕</button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -310,6 +498,8 @@ const QuoteForm = ({ prefill, quoteGroupId, renderActions }: QuoteFormProps) => 
           additionalItems={calcAdditionalForPanel()}
           discountPercent={discountPercent}
           onDiscountChange={setDiscountPercent}
+          discountError={discountError}
+          onDiscountBlur={validateDiscount}
         />
       </div>
     </div>

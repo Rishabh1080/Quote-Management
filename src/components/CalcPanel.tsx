@@ -1,5 +1,6 @@
 interface LineItem {
   label: string;
+  description?: string;
   quantity: number;
   unit_price: number;
   line_total: number;
@@ -10,18 +11,20 @@ interface CalcPanelProps {
   productName: string;
   productBasePrice: number;
   additionalItems: LineItem[];
-  discountPercent: number;
-  onDiscountChange: (val: number) => void;
+  discountPercent: number | string;
+  onDiscountChange: (val: number | string) => void;
   readOnly?: boolean;
+  discountError?: boolean;
+  onDiscountBlur?: () => void;
 }
 
 const fmt = (n: number) => "₹" + Number(n).toLocaleString("en-IN", { minimumFractionDigits: 0 });
 
-const CalcPanel = ({ productName, productBasePrice, additionalItems, discountPercent, onDiscountChange, readOnly }: CalcPanelProps) => {
+const CalcPanel = ({ productName, productBasePrice, additionalItems, discountPercent, onDiscountChange, readOnly, discountError, onDiscountBlur }: CalcPanelProps) => {
   const productTotal = productBasePrice;
   const addTotal = additionalItems.reduce((s, i) => s + i.line_total, 0);
   const subtotal = productTotal + addTotal;
-  const netTotal = subtotal * (1 - discountPercent / 100);
+  const netTotal = subtotal * (1 - (Number(discountPercent) || 0) / 100);
 
   return (
     <div className="card calc-card">
@@ -35,7 +38,10 @@ const CalcPanel = ({ productName, productBasePrice, additionalItems, discountPer
         )}
         {additionalItems.map((item, i) => (
           <li key={i} className="list-group-item d-flex justify-content-between">
-            <span>{item.label} × {item.quantity}</span>
+            <div className="calc-item-label">
+              <div>{item.label} × {item.quantity}</div>
+              {item.description && <div className="calc-item-description">{item.description}</div>}
+            </div>
             <span>{fmt(item.line_total)}</span>
           </li>
         ))}
@@ -48,18 +54,15 @@ const CalcPanel = ({ productName, productBasePrice, additionalItems, discountPer
         <div className="mb-2">
           <label className="form-label mb-1 small">Discount %</label>
           <input
-            type="number"
-            className="form-control form-control-sm"
+            type="text"
+            className={`form-control form-control-sm ${discountError ? 'is-invalid' : ''}`}
             value={discountPercent}
-            min={0}
-            max={100}
             disabled={readOnly}
+            inputMode="numeric"
             onChange={(e) => {
-              let v = parseInt(e.target.value) || 0;
-              if (v < 0) v = 0;
-              if (v > 100) v = 100;
-              onDiscountChange(v);
+              onDiscountChange(e.target.value);
             }}
+            onBlur={onDiscountBlur}
           />
         </div>
         <div className="d-flex justify-content-between border-top pt-2">

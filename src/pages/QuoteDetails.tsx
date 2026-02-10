@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
+import { generateQuotePDF } from "@/lib/pdfExport";
 
 const fmt = (n: number) => "₹" + Number(n).toLocaleString("en-IN", { minimumFractionDigits: 0 });
 
@@ -86,6 +87,31 @@ const QuoteDetails = ({ onQuoteLoaded }: QuoteDetailsPageProps) => {
     loadVersions(quote.quote_group_id);
   };
 
+  const handleExportPDF = () => {
+    if (!quote) return;
+    
+    const pdfData = {
+      company_name: quote.companies?.name || "N/A",
+      product_name: quote.products?.name || "N/A",
+      version_label: quote.version_label,
+      created_at: quote.created_at,
+      discount_percent: quote.discount_percent,
+      subtotal: Number(quote.subtotal),
+      net_total: Number(quote.net_total),
+      line_items: lineItems.map(item => ({
+        label: item.label,
+        description: item.description || "",
+        quantity: item.quantity,
+        unit_price: Number(item.unit_price),
+        line_total: Number(item.line_total),
+        item_type: item.item_type
+      }))
+    };
+    
+    generateQuotePDF(pdfData);
+    toast.success("PDF generated successfully");
+  };
+
   if (loading) return <div className="container py-4"><p>Loading...</p></div>;
   if (!quote) return <div className="container py-4"><p>Quote not found.</p></div>;
 
@@ -102,7 +128,7 @@ const QuoteDetails = ({ onQuoteLoaded }: QuoteDetailsPageProps) => {
           </div>
         </div>
         <div className="d-flex gap-2">
-          <button className="btn btn-outline-dark btn-sm" disabled onClick={() => toast.info("Coming soon")}>
+          <button className="btn btn-outline-dark btn-sm" onClick={handleExportPDF}>
             Export as PDF
           </button>
         </div>

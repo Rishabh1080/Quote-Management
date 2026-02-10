@@ -78,4 +78,4 @@ CREATE POLICY "Allow all access to quote_line_items" ON public.quote_line_items 
 INSERT INTO public.companies (name) VALUES ('Acme Corp'), ('Bright Dental'), ('Orion Labs'), ('Zen Pharma');
 INSERT INTO public.products (name, base_price) VALUES ('LIMS', 1000), ('Athina', 1500);
 INSERT INTO public.statuses (code, label) VALUES ('DRAFT', 'Saved as draft'), ('PENDING_APPROVAL', 'Pending for approval'), ('APPROVED', 'Approved'), ('REJECTED', 'Rejected');
-INSERT INTO public.additional_costs (code, label, default_unit_price) VALUES ('FIXED', 'Fixed', 500), ('MAN_DAYS', 'Man days', 2000), ('STAY_MAN_DAYS', 'Stay man days', 3500);
+INSERT INTO public.additional_costs (code, label, default_unit_price) VALUES ('FIXED', 'Fixed', 500), ('MAN_DAYS', 'Man days', 2000), ('STAY_MAN_DAYS', 'Stay', 3500);

@@ -11,9 +11,9 @@ const AppNavbar = ({ quoteStatus, onApprove, onReject }: AppNavbarProps) => {
   const isDetailsPage = /^\/quotes\/[^/]+$/.test(location.pathname) && !location.pathname.endsWith("/new-version");
 
   return (
-    <nav className="navbar navbar-expand navbar-dark bg-dark px-3">
+    <nav className="navbar navbar-expand navbar-dark bg-light px-3">
       <Link className="navbar-brand" to="/quotes">
-        Quote Mng
+        Quote Management
       </Link>
       <div className="ms-auto d-flex gap-2">
         {isDetailsPage && onReject && (

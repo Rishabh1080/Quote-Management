@@ -123,12 +123,15 @@ export type Database = {
           company_id: string
           created_at: string | null
           discount_percent: number
+          fixed_cost: number | null
           id: string
           is_latest: boolean
+          man_days_cost: number
           net_total: number
           product_id: string
           quote_group_id: string
           status_code: string
+          stay_man_days_cost: number
           subtotal: number
           updated_at: string | null
           version_label: string
@@ -138,12 +141,15 @@ export type Database = {
           company_id: string
           created_at?: string | null
           discount_percent?: number
+          fixed_cost?: number | null
           id?: string
           is_latest?: boolean
+          man_days_cost?: number
           net_total?: number
           product_id: string
           quote_group_id: string
           status_code: string
+          stay_man_days_cost?: number
           subtotal?: number
           updated_at?: string | null
           version_label: string
@@ -153,12 +159,15 @@ export type Database = {
           company_id?: string
           created_at?: string | null
           discount_percent?: number
+          fixed_cost?: number | null
           id?: string
           is_latest?: boolean
+          man_days_cost?: number
           net_total?: number
           product_id?: string
           quote_group_id?: string
           status_code?: string
+          stay_man_days_cost?: number
           subtotal?: number
           updated_at?: string | null
           version_label?: string

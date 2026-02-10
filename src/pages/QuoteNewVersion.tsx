@@ -33,12 +33,36 @@ const QuoteNewVersion = () => {
       }
 
       setGroupId(q.quote_group_id);
+      
+      // Fetch the first version (version_number = 0) to get the default costs
+      const { data: firstVersion } = await supabase
+        .from("quotes")
+        .select("*, quote_line_items(*)")
+        .eq("quote_group_id", q.quote_group_id)
+        .eq("version_number", 0)
+        .single();
+
+      // Extract cost defaults from first version's quote record, fallback to current quote
+      const costDefaults: Record<string, string> = {};
+      const sourceQuote = firstVersion || q;
+      
+      if (sourceQuote.man_days_cost) {
+        costDefaults['MAN_DAYS'] = String(sourceQuote.man_days_cost);
+      }
+      if (sourceQuote.stay_man_days_cost) {
+        costDefaults['STAY_MAN_DAYS'] = String(sourceQuote.stay_man_days_cost);
+      }
+      if (sourceQuote.fixed_cost) {
+        costDefaults['FIXED'] = String(sourceQuote.fixed_cost);
+      }
+
       const additionalItems = (q.quote_line_items || [])
         .filter((li: any) => li.item_type !== "PRODUCT_BASE")
         .sort((a: any, b: any) => a.sort_order - b.sort_order)
         .map((li: any) => ({
           code: li.item_type,
           label: li.label,
+          description: li.description || "",
           quantity: li.quantity,
           unit_price: Number(li.unit_price),
         }));
@@ -48,6 +72,7 @@ const QuoteNewVersion = () => {
         product_id: q.product_id,
         discount_percent: q.discount_percent,
         additionalItems,
+        costDefaults,
       });
       setLoading(false);
     };
