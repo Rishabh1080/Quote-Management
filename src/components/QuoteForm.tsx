@@ -18,11 +18,12 @@ interface QuoteFormProps {
     discount_percent: number;
     additionalItems: AdditionalRow[];
   };
-  quoteGroupId?: string; // for new version
+  quoteGroupId?: string;
   sourceQuoteId?: string;
+  renderActions?: (saving: boolean, saveQuote: (status: string) => void) => React.ReactNode;
 }
 
-const QuoteForm = ({ prefill, quoteGroupId }: QuoteFormProps) => {
+const QuoteForm = ({ prefill, quoteGroupId, renderActions }: QuoteFormProps) => {
   const navigate = useNavigate();
   const [companies, setCompanies] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
@@ -181,6 +182,8 @@ const QuoteForm = ({ prefill, quoteGroupId }: QuoteFormProps) => {
     }));
 
   return (
+    <>
+    {renderActions?.(saving, saveQuote)}
     <div className="row g-4">
       <div className="col-lg-7">
         <div className="card">
@@ -245,19 +248,7 @@ const QuoteForm = ({ prefill, quoteGroupId }: QuoteFormProps) => {
           </div>
         </div>
 
-        {/* CTAs */}
-        <div className="d-flex gap-2 mt-3">
-          <button className="btn btn-secondary" disabled={saving} onClick={() => saveQuote("DRAFT")}>
-            Save as Draft
-          </button>
-          <button className="btn btn-primary" disabled={saving} onClick={() => saveQuote("PENDING_APPROVAL")}>
-            Submit for Approval
-          </button>
-          <button className="btn btn-outline-dark" disabled onClick={() => toast.info("Coming soon")}>
-            Export as PDF
-          </button>
         </div>
-      </div>
 
       <div className="col-lg-5">
         <CalcPanel
@@ -269,6 +260,7 @@ const QuoteForm = ({ prefill, quoteGroupId }: QuoteFormProps) => {
         />
       </div>
     </div>
+    </>
   );
 };
 
