@@ -7,6 +7,7 @@ import { toast } from "sonner";
 interface AdditionalRow {
   code: string;
   label: string;
+  description: string;
   quantity: number;
   unit_price: number;
 }
@@ -34,6 +35,7 @@ const QuoteForm = ({ prefill, quoteGroupId, renderActions }: QuoteFormProps) => 
   const [discountPercent, setDiscountPercent] = useState(prefill?.discount_percent || 0);
   const [additionalItems, setAdditionalItems] = useState<AdditionalRow[]>(prefill?.additionalItems || []);
   const [saving, setSaving] = useState(false);
+  const [costDefaults, setCostDefaults] = useState<Record<string, string>>({});
 
   const selectedProduct = products.find((p) => p.id === productId);
 
@@ -76,10 +78,17 @@ const QuoteForm = ({ prefill, quoteGroupId, renderActions }: QuoteFormProps) => 
     return lines;
   };
 
+  const allDefaultsFilled = costMaster.length > 0 && costMaster.every((c) => {
+    const val = costDefaults[c.code];
+    return val !== undefined && val !== "" && !isNaN(Number(val));
+  });
+
   const addRow = () => {
+    if (!allDefaultsFilled) return;
     const first = costMaster[0];
     if (!first) return;
-    setAdditionalItems([...additionalItems, { code: first.code, label: first.label, quantity: 1, unit_price: Number(first.default_unit_price) }]);
+    const unitPrice = Number(costDefaults[first.code]) || Number(first.default_unit_price);
+    setAdditionalItems([...additionalItems, { code: first.code, label: first.label, description: "", quantity: 1, unit_price: unitPrice }]);
   };
 
   const updateRow = (index: number, field: string, value: any) => {
@@ -87,8 +96,11 @@ const QuoteForm = ({ prefill, quoteGroupId, renderActions }: QuoteFormProps) => 
     if (field === "code") {
       const master = costMaster.find((c) => c.code === value);
       if (master) {
-        copy[index] = { ...copy[index], code: value, label: master.label, unit_price: Number(master.default_unit_price) };
+        const unitPrice = Number(costDefaults[value]) || Number(master.default_unit_price);
+        copy[index] = { ...copy[index], code: value, label: master.label, unit_price: unitPrice };
       }
+    } else if (field === "description") {
+      copy[index] = { ...copy[index], description: value };
     } else if (field === "quantity") {
       let q = parseInt(value) || 0;
       if (q < 1) q = 1;
@@ -216,17 +228,55 @@ const QuoteForm = ({ prefill, quoteGroupId, renderActions }: QuoteFormProps) => 
               </div>
             )}
 
+            {/* Cost Defaults */}
+            {costMaster.length > 0 && (
+              <div className="card bg-light mb-3">
+                <div className="card-body py-2">
+                  <label className="form-label mb-2 fw-semibold" style={{ fontSize: "0.85rem" }}>Set Default Costs</label>
+                  <div className="row g-2">
+                    {costMaster.map((c) => (
+                      <div key={c.code} className="col-sm-4">
+                        <label className="form-label mb-1" style={{ fontSize: "0.8rem" }}>{c.label}</label>
+                        <input
+                          type="number"
+                          className="form-control form-control-sm"
+                          placeholder={`₹ ${c.default_unit_price}`}
+                          value={costDefaults[c.code] ?? ""}
+                          onChange={(e) => setCostDefaults({ ...costDefaults, [c.code]: e.target.value })}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Additional items */}
             <div className="mb-3">
               <div className="d-flex justify-content-between align-items-center mb-2">
                 <label className="form-label mb-0">Additional Items</label>
-                <button className="btn btn-outline-primary btn-sm" type="button" onClick={addRow}>
+                <button
+                  className="btn btn-outline-primary btn-sm"
+                  type="button"
+                  onClick={addRow}
+                  disabled={!allDefaultsFilled}
+                  title={!allDefaultsFilled ? "Please fill all default costs first" : ""}
+                >
                   + Add expense
                 </button>
               </div>
+              {additionalItems.length > 0 && (
+                <div className="row g-2 mb-1">
+                  <div className="col-sm-3"><small className="text-muted fw-semibold">Type</small></div>
+                  <div className="col-sm-3"><small className="text-muted fw-semibold">Description</small></div>
+                  <div className="col-sm-2"><small className="text-muted fw-semibold">Quantity</small></div>
+                  <div className="col-sm-2"><small className="text-muted fw-semibold">Cost</small></div>
+                  <div className="col-sm-2"></div>
+                </div>
+              )}
               {additionalItems.map((item, i) => (
                 <div key={i} className="row g-2 mb-2 align-items-end">
-                  <div className="col-sm-4">
+                  <div className="col-sm-3">
                     <select className="form-select form-select-sm" value={item.code} onChange={(e) => updateRow(i, "code", e.target.value)}>
                       {costMaster.map((c) => (
                         <option key={c.code} value={c.code}>{c.label}</option>
@@ -234,9 +284,12 @@ const QuoteForm = ({ prefill, quoteGroupId, renderActions }: QuoteFormProps) => 
                     </select>
                   </div>
                   <div className="col-sm-3">
+                    <input type="text" className="form-control form-control-sm" placeholder="Description" value={item.description} onChange={(e) => updateRow(i, "description", e.target.value)} />
+                  </div>
+                  <div className="col-sm-2">
                     <input type="number" className="form-control form-control-sm" placeholder="Qty" value={item.quantity} min={1} onChange={(e) => updateRow(i, "quantity", e.target.value)} />
                   </div>
-                  <div className="col-sm-3">
+                  <div className="col-sm-2">
                     <input type="number" className="form-control form-control-sm" placeholder="Unit price" value={item.unit_price} onChange={(e) => updateRow(i, "unit_price", e.target.value)} />
                   </div>
                   <div className="col-sm-2">
