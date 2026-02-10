@@ -22,9 +22,15 @@ const App = () => {
     if (!detailsQuoteId || detailsStatus !== "PENDING_APPROVAL") return;
     await supabase.from("quotes").update({ status_code: "APPROVED" }).eq("id", detailsQuoteId);
     toast.success("Quote approved!");
-    // Force re-render by toggling status
     setDetailsStatus("APPROVED");
-    // Navigate will be handled by component re-fetch
+    window.location.reload();
+  };
+
+  const handleReject = async () => {
+    if (!detailsQuoteId || detailsStatus !== "PENDING_APPROVAL") return;
+    await supabase.from("quotes").update({ status_code: "REJECTED" }).eq("id", detailsQuoteId);
+    toast.success("Quote rejected");
+    setDetailsStatus("REJECTED");
     window.location.reload();
   };
 
@@ -32,7 +38,7 @@ const App = () => {
     <>
       <Sonner />
       <BrowserRouter>
-        <AppNavbar quoteStatus={detailsStatus} onApprove={handleApprove} />
+        <AppNavbar quoteStatus={detailsStatus} onApprove={handleApprove} onReject={handleReject} />
         <Routes>
           <Route path="/" element={<Navigate to="/quotes" replace />} />
           <Route path="/quotes" element={<QuotesList />} />
