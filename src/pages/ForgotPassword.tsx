@@ -27,7 +27,17 @@ const ForgotPassword = () => {
         redirectTo: redirectUrl,
       });
 
-      if (error) throw error;
+      if (error) {
+        // Handle rate limit error specifically
+        if (error.message.toLowerCase().includes("rate limit") || 
+            error.message.toLowerCase().includes("too many")) {
+          toast.error("Too many password reset attempts. Please try again in an hour.");
+        } else {
+          toast.error(error.message || "Failed to send reset email");
+        }
+        setLoading(false);
+        return;
+      }
 
       setEmailSent(true);
       toast.success("Password reset link sent to your email");
