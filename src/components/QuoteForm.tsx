@@ -108,6 +108,25 @@ const QuoteForm = ({ prefill, quoteGroupId, existingQuoteId, renderActions }: Qu
     }
   }, [costDefaults['MAN_DAYS'], costDefaults['STAY_MAN_DAYS'], costDefaults['HARDWARE']]);
 
+  // Recalculate expense item unit prices when cost defaults change
+  useEffect(() => {
+    if (additionalItems.length > 0) {
+      const manDaysCost = Number(costDefaults['MAN_DAYS']) || 0;
+      const stayManDaysCost = Number(costDefaults['STAY_MAN_DAYS']) || 0;
+      
+      const updated = additionalItems.map(item => {
+        if (item.code === 'MAN_DAYS') {
+          return { ...item, unit_price: manDaysCost };
+        } else if (item.code === 'STAY_MAN_DAYS') {
+          return { ...item, unit_price: manDaysCost + stayManDaysCost };
+        }
+        // FIXED items keep their manually entered unit_price
+        return item;
+      });
+      setAdditionalItems(updated);
+    }
+  }, [costDefaults['MAN_DAYS'], costDefaults['STAY_MAN_DAYS']]);
+
   const calcLineItems = () => {
     const lines: any[] = [];
     if (selectedProduct) {
