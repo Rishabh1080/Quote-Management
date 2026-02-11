@@ -1,9 +1,13 @@
 import { useState, useCallback } from "react";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider } from "@/contexts/AuthContext";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import AppNavbar from "@/components/AppNavbar";
+import Login from "@/pages/Login";
 import QuotesList from "@/pages/QuotesList";
 import QuoteCreate from "@/pages/QuoteCreate";
+import QuoteEdit from "@/pages/QuoteEdit";
 import QuoteDetails from "@/pages/QuoteDetails";
 import QuoteNewVersion from "@/pages/QuoteNewVersion";
 import { supabase } from "@/lib/supabaseClient";
@@ -38,14 +42,27 @@ const App = () => {
     <>
       <Sonner />
       <BrowserRouter>
-        <AppNavbar quoteStatus={detailsStatus} onApprove={handleApprove} onReject={handleReject} />
-        <Routes>
-          <Route path="/" element={<Navigate to="/quotes" replace />} />
-          <Route path="/quotes" element={<QuotesList />} />
-          <Route path="/quotes/new" element={<QuoteCreate />} />
-          <Route path="/quotes/:id" element={<QuoteDetails onQuoteLoaded={handleQuoteLoaded} />} />
-          <Route path="/quotes/:id/new-version" element={<QuoteNewVersion />} />
-        </Routes>
+        <AuthProvider>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route
+              path="/*"
+              element={
+                <ProtectedRoute>
+                  <AppNavbar quoteStatus={detailsStatus} onApprove={handleApprove} onReject={handleReject} />
+                  <Routes>
+                    <Route path="/" element={<Navigate to="/quotes" replace />} />
+                    <Route path="/quotes" element={<QuotesList />} />
+                    <Route path="/quotes/new" element={<QuoteCreate />} />
+                    <Route path="/quotes/:id/edit" element={<QuoteEdit />} />
+                    <Route path="/quotes/:id" element={<QuoteDetails onQuoteLoaded={handleQuoteLoaded} />} />
+                    <Route path="/quotes/:id/new-version" element={<QuoteNewVersion />} />
+                  </Routes>
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </>
   );

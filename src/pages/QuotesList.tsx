@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
+import { useAuth } from "@/contexts/AuthContext";
 
 const statusBadge = (code: string) => {
   const cls: Record<string, string> = {
@@ -21,26 +22,39 @@ const statusBadge = (code: string) => {
 const fmt = (n: number) => "₹" + Number(n).toLocaleString("en-IN", { minimumFractionDigits: 0 });
 
 const QuotesList = () => {
+  const { user } = useAuth();
   const [quotes, setQuotes] = useState<any[]>([]);
   const [filter, setFilter] = useState("ALL");
   const [versionCounts, setVersionCounts] = useState<Record<string, number>>({});
 
   const load = async () => {
+    if (!user) return;
+
     let query = supabase
       .from("quotes")
-      .select("*, companies(name)")
+      .select("*, companies(name), users(name)")
       .eq("is_latest", true)
       .order("created_at", { ascending: false });
 
     if (filter !== "ALL") {
       query = query.eq("status_code", filter);
     }
+    
     const { data } = await query;
-    setQuotes(data || []);
+    
+    // Filter: Show all non-draft quotes + user's own drafts
+    const filteredData = data?.filter((q: any) => {
+      if (q.status_code === "DRAFT") {
+        return q.created_by === user.id;
+      }
+      return true;
+    }) || [];
+    
+    setQuotes(filteredData);
 
     // get version counts per group
-    if (data && data.length > 0) {
-      const groupIds = [...new Set(data.map((q: any) => q.quote_group_id))];
+    if (filteredData && filteredData.length > 0) {
+      const groupIds = [...new Set(filteredData.map((q: any) => q.quote_group_id))];
       const { data: allVersions } = await supabase
         .from("quotes")
         .select("quote_group_id")
@@ -55,7 +69,7 @@ const QuotesList = () => {
 
   useEffect(() => {
     load();
-  }, [filter]);
+  }, [filter, user]);
 
   return (
     <div className="container py-4">
@@ -84,6 +98,7 @@ const QuotesList = () => {
               <th>Company</th>
               <th>Net Total</th>
               <th>Status</th>
+              <th>Created By</th>
               <th>Version</th>
               <th>Versions</th>
               <th>Action</th>
@@ -91,7 +106,7 @@ const QuotesList = () => {
           </thead>
           <tbody>
             {quotes.length === 0 && (
-              <tr><td colSpan={7} className="text-center text-muted py-4">No quotes found</td></tr>
+              <tr><td colSpan={8} className="text-center text-muted py-4">No quotes found</td></tr>
             )}
             {quotes.map((q, i) => {
               const older = (versionCounts[q.quote_group_id] || 1) - 1;
@@ -105,12 +120,19 @@ const QuotesList = () => {
                   </td>
                   <td>{fmt(q.net_total)}</td>
                   <td>{statusBadge(q.status_code)}</td>
+                  <td><small className="text-muted">{q.users?.name || "—"}</small></td>
                   <td><small className="text-muted">{q.version_label}</small></td>
                   <td>{older > 0 ? <small className="text-muted">{older} older</small> : "—"}</td>
                   <td>
-                    <Link to={`/quotes/${q.id}`} className="btn btn-outline-dark btn-sm">
-                      View
-                    </Link>
+                    {q.status_code === 'DRAFT' ? (
+                      <Link to={`/quotes/${q.id}/edit`} className="btn btn-outline-primary btn-sm">
+                        Edit
+                      </Link>
+                    ) : (
+                      <Link to={`/quotes/${q.id}`} className="btn btn-outline-dark btn-sm">
+                        View
+                      </Link>
+                    )}
                   </td>
                 </tr>
               );

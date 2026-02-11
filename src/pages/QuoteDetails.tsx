@@ -52,7 +52,7 @@ const QuoteDetails = ({ onQuoteLoaded }: QuoteDetailsPageProps) => {
 
     const { data: q } = await supabase
       .from("quotes")
-      .select("*, companies(name), products(name, base_price)")
+      .select("*, companies(name), products(name, base_price), users(name)")
       .eq("id", id)
       .single();
     setQuote(q);
@@ -124,7 +124,10 @@ const QuoteDetails = ({ onQuoteLoaded }: QuoteDetailsPageProps) => {
           <Link to="/quotes" className="btn btn-outline-secondary btn-sm mt-1">← Back</Link>
           <div>
             <h4 className="mb-1">{quote.companies?.name}</h4>
-            <p className="text-muted mb-0">{quote.version_label} · {statusBadge(quote.status_code)}</p>
+            <p className="text-muted mb-0">
+              {quote.version_label} · {statusBadge(quote.status_code)}
+              {quote.users?.name && <> · Created by {quote.users.name}</>}
+            </p>
           </div>
         </div>
         <div className="d-flex gap-2">

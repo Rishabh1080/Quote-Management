@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
+import { useAuth } from "@/contexts/AuthContext";
 import CalcPanel from "./CalcPanel";
 import { toast } from "sonner";
 
@@ -22,11 +23,13 @@ interface QuoteFormProps {
   };
   quoteGroupId?: string;
   sourceQuoteId?: string;
+  existingQuoteId?: string;
   renderActions?: (saving: boolean, saveQuote: (status: string) => void) => React.ReactNode;
 }
 
-const QuoteForm = ({ prefill, quoteGroupId, renderActions }: QuoteFormProps) => {
+const QuoteForm = ({ prefill, quoteGroupId, existingQuoteId, renderActions }: QuoteFormProps) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [companies, setCompanies] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [costMaster, setCostMaster] = useState<any[]>([]);
@@ -40,6 +43,8 @@ const QuoteForm = ({ prefill, quoteGroupId, renderActions }: QuoteFormProps) => 
   const [costDefaultsErrors, setCostDefaultsErrors] = useState<Record<string, boolean>>({});
   const [expenseErrors, setExpenseErrors] = useState<Record<number, { quantity?: boolean; unit_price?: boolean }>>({});
   const [discountError, setDiscountError] = useState(false);
+  const [companyError, setCompanyError] = useState(false);
+  const [productError, setProductError] = useState(false);
 
   const selectedProduct = products.find((p) => p.id === productId);
 
@@ -222,49 +227,123 @@ const QuoteForm = ({ prefill, quoteGroupId, renderActions }: QuoteFormProps) => 
   };
 
   const saveQuote = async (statusCode: string) => {
-    if (!companyId || !productId) {
-      toast.error("Company and Product are required");
-      return;
-    }
-    
-    // Validate that mandatory costs are filled
-    if (!costDefaults['MAN_DAYS'] || !costDefaults['STAY_MAN_DAYS']) {
-      toast.error("Man days and Stay costs are required");
-      return;
-    }
-    
-    // Validate discount is filled (can be 0 but must be a number)
-    if (discountPercent === "" || discountPercent === null || discountPercent === undefined || isNaN(Number(discountPercent))) {
-      toast.error("Discount percentage is required");
-      return;
-    }
-    
-    // For "Submit for Approval", validate all expense items have quantity and cost
+    // Only validate if submitting for approval
     if (statusCode === 'PENDING_APPROVAL') {
+      let hasErrors = false;
+
+      // Validate Company (mandatory)
+      if (!companyId) {
+        setCompanyError(true);
+        hasErrors = true;
+      }
+
+      // Validate Product (mandatory)
+      if (!productId) {
+        setProductError(true);
+        hasErrors = true;
+      }
+      
+      // Validate that mandatory costs are filled
+      const costErrors: Record<string, boolean> = {};
+      costMaster.filter(c => c.code !== 'FIXED').forEach((c) => {
+        const val = costDefaults[c.code];
+        if (!val || val === "" || isNaN(Number(val))) {
+          costErrors[c.code] = true;
+          hasErrors = true;
+        }
+      });
+      if (Object.keys(costErrors).length > 0) {
+        setCostDefaultsErrors(costErrors);
+      }
+      
+      // Validate discount is filled (can be 0 but must be a number)
+      if (discountPercent === "" || discountPercent === null || discountPercent === undefined || isNaN(Number(discountPercent))) {
+        setDiscountError(true);
+        hasErrors = true;
+      }
+      
+      // Validate all expense items have quantity and cost
+      const expErrors: Record<number, { quantity?: boolean; unit_price?: boolean }> = {};
+      
       for (let i = 0; i < additionalItems.length; i++) {
         const item = additionalItems[i];
         const qty = Number(item.quantity);
+        
+        // Validate quantity (mandatory for all items)
         if (!item.quantity || item.quantity === "" || isNaN(qty) || qty < 1) {
-          toast.error(`Expense item ${i + 1}: Quantity is required`);
-          return;
+          if (!expErrors[i]) expErrors[i] = {};
+          expErrors[i].quantity = true;
+          hasErrors = true;
         }
+        
+        // Validate cost (mandatory for FIXED items only)
         if (item.code === 'FIXED') {
           const cost = Number(item.unit_price);
           if (!item.unit_price || item.unit_price === "" || isNaN(cost) || cost <= 0) {
-            toast.error(`Expense item ${i + 1}: Cost is required for Fixed items`);
-            return;
+            if (!expErrors[i]) expErrors[i] = {};
+            expErrors[i].unit_price = true;
+            hasErrors = true;
           }
         }
       }
+      
+      if (Object.keys(expErrors).length > 0) {
+        setExpenseErrors(expErrors);
+      }
+
+      // If any validation errors, show toast and stop
+      if (hasErrors) {
+        toast.error("Please fill all required fields correctly");
+        return;
+      }
+    }
+    
+    // Basic validation for both Draft and Approval (only Company and Product required)
+    if (!companyId || !productId) {
+      toast.error("Company and Product are required");
+      return;
     }
     
     setSaving(true);
     try {
       const lines = calcLineItems();
       const subtotal = lines.reduce((s, l) => s + l.line_total, 0);
-      const netTotal = subtotal * (1 - discountPercent / 100);
+      const netTotal = subtotal * (1 - (Number(discountPercent) || 0) / 100);
       const today = new Date().toISOString().slice(0, 10);
 
+      // If editing existing draft, update it
+      if (existingQuoteId) {
+        const { error: updateError } = await supabase
+          .from("quotes")
+          .update({
+            company_id: companyId,
+            product_id: productId,
+            discount_percent: Number(discountPercent) || 0,
+            subtotal,
+            net_total: netTotal,
+            fixed_cost: costDefaults['FIXED'] ? Number(costDefaults['FIXED']) : null,
+            man_days_cost: Number(costDefaults['MAN_DAYS']) || 0,
+            stay_man_days_cost: Number(costDefaults['STAY_MAN_DAYS']) || 0,
+            status_code: statusCode,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existingQuoteId);
+
+        if (updateError) throw updateError;
+
+        // Delete old line items and insert new ones
+        await supabase.from("quote_line_items").delete().eq("quote_id", existingQuoteId);
+        
+        const lineRows = lines.map((l) => ({ ...l, quote_id: existingQuoteId }));
+        const { error: lineErr } = await supabase.from("quote_line_items").insert(lineRows);
+        if (lineErr) throw lineErr;
+
+        toast.success("Quote updated!");
+        navigate("/quotes");
+        return;
+      }
+
+      // Otherwise, create new quote
       let groupId = quoteGroupId || crypto.randomUUID();
       let versionNumber = 0;
 
@@ -305,6 +384,7 @@ const QuoteForm = ({ prefill, quoteGroupId, renderActions }: QuoteFormProps) => 
           fixed_cost: costDefaults['FIXED'] ? Number(costDefaults['FIXED']) : null,
           man_days_cost: Number(costDefaults['MAN_DAYS']),
           stay_man_days_cost: Number(costDefaults['STAY_MAN_DAYS']),
+          created_by: user?.id || null,
         })
         .select()
         .single();
@@ -357,7 +437,14 @@ const QuoteForm = ({ prefill, quoteGroupId, renderActions }: QuoteFormProps) => 
             {/* Company */}
             <div className="mb-3">
               <label className="form-label">Company *</label>
-              <select className="form-select" value={companyId} onChange={(e) => setCompanyId(e.target.value)}>
+              <select 
+                className={`form-select ${companyError ? 'is-invalid' : ''}`}
+                value={companyId} 
+                onChange={(e) => {
+                  setCompanyId(e.target.value);
+                  if (companyError) setCompanyError(false);
+                }}
+              >
                 <option value="">Select company</option>
                 {companies.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
@@ -368,7 +455,14 @@ const QuoteForm = ({ prefill, quoteGroupId, renderActions }: QuoteFormProps) => 
             {/* Product */}
             <div className="mb-3">
               <label className="form-label">Product *</label>
-              <select className="form-select" value={productId} onChange={(e) => setProductId(e.target.value)}>
+              <select 
+                className={`form-select ${productError ? 'is-invalid' : ''}`}
+                value={productId} 
+                onChange={(e) => {
+                  setProductId(e.target.value);
+                  if (productError) setProductError(false);
+                }}
+              >
                 <option value="">Select product</option>
                 {products.map((p) => (
                   <option key={p.id} value={p.id}>{p.name}</option>
