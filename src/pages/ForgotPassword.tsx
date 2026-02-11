@@ -7,12 +7,16 @@ const ForgotPassword = () => {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage("");
     
     if (!email) {
-      toast.error("Please enter your email");
+      const msg = "Please enter your email";
+      setErrorMessage(msg);
+      toast.error(msg);
       return;
     }
 
@@ -29,12 +33,15 @@ const ForgotPassword = () => {
 
       if (error) {
         // Handle rate limit error specifically
+        let msg = "";
         if (error.message.toLowerCase().includes("rate limit") || 
             error.message.toLowerCase().includes("too many")) {
-          toast.error("Too many password reset attempts. Please try again in an hour.");
+          msg = "Too many password reset attempts. Please try again in an hour.";
         } else {
-          toast.error(error.message || "Failed to send reset email");
+          msg = error.message || "Failed to send reset email";
         }
+        setErrorMessage(msg);
+        toast.error(msg);
         setLoading(false);
         return;
       }
@@ -42,7 +49,9 @@ const ForgotPassword = () => {
       setEmailSent(true);
       toast.success("Password reset link sent to your email");
     } catch (error: any) {
-      toast.error(error.message || "Failed to send reset email");
+      const msg = error.message || "Failed to send reset email";
+      setErrorMessage(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -54,6 +63,12 @@ const ForgotPassword = () => {
         <div className="card-body p-4">
           <h2 className="text-center mb-4">Quote Management</h2>
           <h5 className="text-center text-muted mb-4">Forgot Password</h5>
+          
+          {errorMessage && (
+            <div className="alert alert-danger" role="alert">
+              {errorMessage}
+            </div>
+          )}
           
           {emailSent ? (
             <div>
