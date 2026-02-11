@@ -19,6 +19,7 @@ interface InstrumentRow {
   man_days: number | string;
   integration_cost: number;
   hardware_cost: number | string;
+  hardware_cost_manual?: boolean; // Track if user manually edited hardware cost
 }
 
 interface QuoteFormProps {
@@ -83,6 +84,30 @@ const QuoteForm = ({ prefill, quoteGroupId, existingQuoteId, renderActions }: Qu
     }
   }, [discountPercent]);
 
+  // Recalculate instrument costs when cost defaults change
+  useEffect(() => {
+    if (instruments.length > 0) {
+      const manDaysCost = Number(costDefaults['MAN_DAYS']) || 0;
+      const stayManDaysCost = Number(costDefaults['STAY_MAN_DAYS']) || 0;
+      const hardwareCostDefault = Number(costDefaults['HARDWARE']) || 0;
+      
+      const updated = instruments.map(inst => {
+        const newInst = {
+          ...inst,
+          integration_cost: (Number(inst.man_days) || 0) * (manDaysCost + stayManDaysCost)
+        };
+        
+        // Only update hardware cost if not manually edited
+        if (!inst.hardware_cost_manual) {
+          newInst.hardware_cost = (Number(inst.quantity) || 0) * hardwareCostDefault;
+        }
+        
+        return newInst;
+      });
+      setInstruments(updated);
+    }
+  }, [costDefaults['MAN_DAYS'], costDefaults['STAY_MAN_DAYS'], costDefaults['HARDWARE']]);
+
   const calcLineItems = () => {
     const lines: any[] = [];
     if (selectedProduct) {
@@ -129,6 +154,10 @@ const QuoteForm = ({ prefill, quoteGroupId, existingQuoteId, renderActions }: Qu
     if (!val || val === "" || isNaN(Number(val))) {
       setCostDefaultsErrors({ ...costDefaultsErrors, [code]: true });
     }
+  };
+
+  const handleCostDefaultBlur = (code: string) => {
+    validateCostDefault(code);
   };
 
   const addRow = () => {
@@ -242,12 +271,26 @@ const QuoteForm = ({ prefill, quoteGroupId, existingQuoteId, renderActions }: Qu
 
   // Instrument functions
   const addInstrument = () => {
+    // Check if hardware cost is filled
+    const hardwareCost = costDefaults['HARDWARE'];
+    if (!hardwareCost || hardwareCost === "" || isNaN(Number(hardwareCost))) {
+      setCostDefaultsErrors({ ...costDefaultsErrors, HARDWARE: true });
+      toast.error("Please enter Hardware cost before adding instruments");
+      return;
+    }
+    
+    // Clear any errors
+    setCostDefaultsErrors({ ...costDefaultsErrors, HARDWARE: false });
+    
+    // Auto-fetch hardware cost from defaults
+    const hardwareCostDefault = Number(costDefaults['HARDWARE']) || 0;
+    
     setInstruments([...instruments, { 
       instrument_name: "", 
       quantity: "", 
       man_days: "", 
       integration_cost: 0, 
-      hardware_cost: "" 
+      hardware_cost: hardwareCostDefault
     }]);
   };
 
@@ -257,10 +300,12 @@ const QuoteForm = ({ prefill, quoteGroupId, existingQuoteId, renderActions }: Qu
       copy[index] = { ...copy[index], instrument_name: value };
     } else if (field === "quantity") {
       copy[index] = { ...copy[index], quantity: value };
-      // Recalculate hardware cost when quantity changes
-      const qty = Number(value) || 0;
-      const hardwareCostDefault = Number(costDefaults['HARDWARE']) || 0;
-      copy[index].hardware_cost = qty * hardwareCostDefault;
+      // Recalculate hardware cost when quantity changes (only if not manually edited)
+      if (!copy[index].hardware_cost_manual) {
+        const qty = Number(value) || 0;
+        const hardwareCostDefault = Number(costDefaults['HARDWARE']) || 0;
+        copy[index].hardware_cost = qty * hardwareCostDefault;
+      }
     } else if (field === "man_days") {
       copy[index] = { ...copy[index], man_days: value };
       // Calculate integration cost
@@ -268,6 +313,9 @@ const QuoteForm = ({ prefill, quoteGroupId, existingQuoteId, renderActions }: Qu
       const manDaysCost = Number(costDefaults['MAN_DAYS']) || 0;
       const stayManDaysCost = Number(costDefaults['STAY_MAN_DAYS']) || 0;
       copy[index].integration_cost = manDays * (manDaysCost + stayManDaysCost);
+    } else if (field === "hardware_cost") {
+      // Mark as manually edited
+      copy[index] = { ...copy[index], hardware_cost: value, hardware_cost_manual: true };
     }
     setInstruments(copy);
   };
@@ -602,7 +650,7 @@ const QuoteForm = ({ prefill, quoteGroupId, existingQuoteId, renderActions }: Qu
                               setCostDefaultsErrors({ ...costDefaultsErrors, [c.code]: false });
                             }
                           }}
-                          onBlur={() => validateCostDefault(c.code)}
+                          onBlur={() => handleCostDefaultBlur(c.code)}
                         />
                       </div>
                     ))}
@@ -749,13 +797,16 @@ const QuoteForm = ({ prefill, quoteGroupId, existingQuoteId, renderActions }: Qu
               <>
                 <div className="row g-2 mb-1">
                   <div className="col-sm-3"><small className="text-muted fw-semibold">Instrument Name</small></div>
-                  <div className="col-sm-2"><small className="text-muted fw-semibold">Quantity</small></div>
-                  <div className="col-sm-2"><small className="text-muted fw-semibold">Man days</small></div>
+                  <div className="col-sm-1"><small className="text-muted fw-semibold">Quantity</small></div>
+                  <div className="col-sm-1"><small className="text-muted fw-semibold">Man days</small></div>
                   <div className="col-sm-2"><small className="text-muted fw-semibold">Integration Cost</small></div>
                   <div className="col-sm-2"><small className="text-muted fw-semibold">Hardware Cost</small></div>
+                  <div className="col-sm-2"><small className="text-muted fw-semibold">Total</small></div>
                   <div className="col-sm-1"></div>
                 </div>
-                {instruments.map((inst, i) => (
+                {instruments.map((inst, i) => {
+                  const rowTotal = inst.integration_cost + (Number(inst.hardware_cost) || 0);
+                  return (
                   <div key={i} className="row g-2 mb-2 align-items-end">
                     <div className="col-sm-3">
                       <input 
@@ -766,7 +817,7 @@ const QuoteForm = ({ prefill, quoteGroupId, existingQuoteId, renderActions }: Qu
                         placeholder="Name"
                       />
                     </div>
-                    <div className="col-sm-2">
+                    <div className="col-sm-1">
                       <input 
                         type="text" 
                         className="form-control form-control-sm" 
@@ -775,7 +826,7 @@ const QuoteForm = ({ prefill, quoteGroupId, existingQuoteId, renderActions }: Qu
                         inputMode="numeric"
                       />
                     </div>
-                    <div className="col-sm-2">
+                    <div className="col-sm-1">
                       <input 
                         type="text" 
                         className="form-control form-control-sm" 
@@ -798,6 +849,15 @@ const QuoteForm = ({ prefill, quoteGroupId, existingQuoteId, renderActions }: Qu
                         type="text" 
                         className="form-control form-control-sm" 
                         value={typeof inst.hardware_cost === 'number' ? inst.hardware_cost.toFixed(2) : inst.hardware_cost} 
+                        onChange={(e) => updateInstrument(i, "hardware_cost", e.target.value)}
+                        inputMode="numeric"
+                      />
+                    </div>
+                    <div className="col-sm-2">
+                      <input 
+                        type="text" 
+                        className="form-control form-control-sm" 
+                        value={rowTotal.toFixed(2)} 
                         readOnly
                         disabled
                       />
@@ -806,12 +866,13 @@ const QuoteForm = ({ prefill, quoteGroupId, existingQuoteId, renderActions }: Qu
                       <button className="btn btn-outline-danger btn-sm w-100" onClick={() => removeInstrument(i)}>✕</button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
                 {/* Totals Row */}
                 <div className="row g-2 mt-2 pt-2 border-top">
                   <div className="col-sm-3"></div>
-                  <div className="col-sm-2"></div>
-                  <div className="col-sm-2 text-end">
+                  <div className="col-sm-1"></div>
+                  <div className="col-sm-1 text-end">
                     <strong>Totals:</strong>
                   </div>
                   <div className="col-sm-2">
@@ -828,6 +889,15 @@ const QuoteForm = ({ prefill, quoteGroupId, existingQuoteId, renderActions }: Qu
                       type="text" 
                       className="form-control form-control-sm fw-bold" 
                       value={calcTotalHardwareCost().toFixed(2)} 
+                      readOnly
+                      disabled
+                    />
+                  </div>
+                  <div className="col-sm-2">
+                    <input 
+                      type="text" 
+                      className="form-control form-control-sm fw-bold" 
+                      value={(calcTotalIntegrationCost() + calcTotalHardwareCost()).toFixed(2)} 
                       readOnly
                       disabled
                     />
