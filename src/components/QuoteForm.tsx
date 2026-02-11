@@ -315,6 +315,11 @@ const QuoteForm = ({ prefill, quoteGroupId, existingQuoteId, renderActions }: Qu
       const netTotal = subtotal * (1 - (Number(discountPercent) || 0) / 100);
       const today = new Date().toISOString().slice(0, 10);
 
+      // Parse cost values safely
+      const manDaysCost = costDefaults['MAN_DAYS'] ? Number(costDefaults['MAN_DAYS']) : 0;
+      const stayManDaysCost = costDefaults['STAY_MAN_DAYS'] ? Number(costDefaults['STAY_MAN_DAYS']) : 0;
+      const fixedCost = costDefaults['FIXED'] ? Number(costDefaults['FIXED']) : null;
+
       // If editing existing draft, update it
       if (existingQuoteId) {
         const { error: updateError } = await supabase
@@ -325,9 +330,9 @@ const QuoteForm = ({ prefill, quoteGroupId, existingQuoteId, renderActions }: Qu
             discount_percent: Number(discountPercent) || 0,
             subtotal,
             net_total: netTotal,
-            fixed_cost: costDefaults['FIXED'] ? Number(costDefaults['FIXED']) : null,
-            man_days_cost: Number(costDefaults['MAN_DAYS']) || 0,
-            stay_man_days_cost: Number(costDefaults['STAY_MAN_DAYS']) || 0,
+            fixed_cost: fixedCost,
+            man_days_cost: manDaysCost,
+            stay_man_days_cost: stayManDaysCost,
             remarks: remarks || null,
             notes: notes || null,
             status_code: statusCode,
@@ -385,12 +390,12 @@ const QuoteForm = ({ prefill, quoteGroupId, existingQuoteId, renderActions }: Qu
           status_code: statusCode,
           company_id: companyId,
           product_id: productId,
-          discount_percent: Number(discountPercent),
+          discount_percent: Number(discountPercent) || 0,
           subtotal,
           net_total: netTotal,
-          fixed_cost: costDefaults['FIXED'] ? Number(costDefaults['FIXED']) : null,
-          man_days_cost: Number(costDefaults['MAN_DAYS']),
-          stay_man_days_cost: Number(costDefaults['STAY_MAN_DAYS']),
+          fixed_cost: fixedCost,
+          man_days_cost: manDaysCost,
+          stay_man_days_cost: stayManDaysCost,
           remarks: remarks || null,
           notes: notes || null,
           created_by: user?.id || null,
