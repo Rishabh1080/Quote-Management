@@ -304,6 +304,8 @@ const QuoteForm = ({ prefill, quoteGroupId, existingQuoteId, renderActions }: Qu
     
     // Basic validation for both Draft and Approval (only Company and Product required)
     if (!companyId || !productId) {
+      if (!companyId) setCompanyError(true);
+      if (!productId) setProductError(true);
       toast.error("Company and Product are required");
       return;
     }
