@@ -19,8 +19,12 @@ const ForgotPassword = () => {
     setLoading(true);
 
     try {
+      // Use environment variable or fallback to current origin
+      const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+      const redirectUrl = `${baseUrl}/reset-password`;
+        
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: redirectUrl,
       });
 
       if (error) throw error;
