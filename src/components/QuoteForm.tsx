@@ -325,6 +325,7 @@ const QuoteForm = ({ prefill, quoteGroupId, existingQuoteId, renderActions }: Qu
             man_days_cost: Number(costDefaults['MAN_DAYS']) || 0,
             stay_man_days_cost: Number(costDefaults['STAY_MAN_DAYS']) || 0,
             status_code: statusCode,
+            created_by: user?.id || null,
             updated_at: new Date().toISOString(),
           })
           .eq("id", existingQuoteId);

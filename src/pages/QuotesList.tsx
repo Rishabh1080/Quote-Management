@@ -98,7 +98,7 @@ const QuotesList = () => {
               <th>Company</th>
               <th>Net Total</th>
               <th>Status</th>
-              <th>Created By</th>
+              <th>Last Edited By</th>
               <th>Version</th>
               <th>Versions</th>
               <th>Action</th>

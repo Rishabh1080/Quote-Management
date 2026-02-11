@@ -215,6 +215,30 @@ export type Database = {
         }
         Relationships: []
       }
+      users: {
+        Row: {
+          can_approve: boolean
+          created_at: string | null
+          id: string
+          name: string
+          username: string
+        }
+        Insert: {
+          can_approve?: boolean
+          created_at?: string | null
+          id: string
+          name: string
+          username: string
+        }
+        Update: {
+          can_approve?: boolean
+          created_at?: string | null
+          id?: string
+          name?: string
+          username?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

@@ -126,7 +126,7 @@ const QuoteDetails = ({ onQuoteLoaded }: QuoteDetailsPageProps) => {
             <h4 className="mb-1">{quote.companies?.name}</h4>
             <p className="text-muted mb-0">
               {quote.version_label} · {statusBadge(quote.status_code)}
-              {quote.users?.name && <> · Created by {quote.users.name}</>}
+              {quote.users?.name && <> · Last edited by {quote.users.name}</>}
             </p>
           </div>
         </div>
