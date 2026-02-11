@@ -125,6 +125,7 @@ export type Database = {
           created_by: string | null
           discount_percent: number
           fixed_cost: number | null
+          hardware_cost: number
           id: string
           is_latest: boolean
           man_days_cost: number
@@ -146,6 +147,7 @@ export type Database = {
           created_by?: string | null
           discount_percent?: number
           fixed_cost?: number | null
+          hardware_cost?: number
           id?: string
           is_latest?: boolean
           man_days_cost?: number
@@ -167,6 +169,7 @@ export type Database = {
           created_by?: string | null
           discount_percent?: number
           fixed_cost?: number | null
+          hardware_cost?: number
           id?: string
           is_latest?: boolean
           man_days_cost?: number
@@ -220,6 +223,50 @@ export type Database = {
           label?: string
         }
         Relationships: []
+      }
+      instruments: {
+        Row: {
+          id: string
+          quote_id: string
+          instrument_name: string
+          quantity: number
+          man_days: number
+          integration_cost: number
+          hardware_cost: number
+          sort_order: number
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          quote_id: string
+          instrument_name: string
+          quantity?: number
+          man_days?: number
+          integration_cost?: number
+          hardware_cost?: number
+          sort_order?: number
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          quote_id?: string
+          instrument_name?: string
+          quantity?: number
+          man_days?: number
+          integration_cost?: number
+          hardware_cost?: number
+          sort_order?: number
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instruments_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       users: {
         Row: {

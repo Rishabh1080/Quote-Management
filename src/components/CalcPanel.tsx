@@ -11,6 +11,7 @@ interface CalcPanelProps {
   productName: string;
   productBasePrice: number;
   additionalItems: LineItem[];
+  instrumentIntegrationCost?: number;
   discountPercent: number | string;
   onDiscountChange: (val: number | string) => void;
   readOnly?: boolean;
@@ -20,10 +21,10 @@ interface CalcPanelProps {
 
 const fmt = (n: number) => "₹" + Number(n).toLocaleString("en-IN", { minimumFractionDigits: 0 });
 
-const CalcPanel = ({ productName, productBasePrice, additionalItems, discountPercent, onDiscountChange, readOnly, discountError, onDiscountBlur }: CalcPanelProps) => {
+const CalcPanel = ({ productName, productBasePrice, additionalItems, instrumentIntegrationCost = 0, discountPercent, onDiscountChange, readOnly, discountError, onDiscountBlur }: CalcPanelProps) => {
   const productTotal = productBasePrice;
   const addTotal = additionalItems.reduce((s, i) => s + i.line_total, 0);
-  const subtotal = productTotal + addTotal;
+  const subtotal = productTotal + addTotal + instrumentIntegrationCost;
   const netTotal = subtotal * (1 - (Number(discountPercent) || 0) / 100);
 
   return (
@@ -45,6 +46,12 @@ const CalcPanel = ({ productName, productBasePrice, additionalItems, discountPer
             <span>{fmt(item.line_total)}</span>
           </li>
         ))}
+        {instrumentIntegrationCost > 0 && (
+          <li className="list-group-item d-flex justify-content-between">
+            <span>Instrument Integration Cost</span>
+            <span>{fmt(instrumentIntegrationCost)}</span>
+          </li>
+        )}
       </ul>
       <div className="card-body">
         <div className="d-flex justify-content-between mb-2">
