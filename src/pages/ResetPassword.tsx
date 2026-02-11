@@ -8,6 +8,7 @@ const ResetPassword = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [isValidSession, setIsValidSession] = useState(false);
+  const [userName, setUserName] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -17,6 +18,22 @@ const ResetPassword = () => {
       
       if (session) {
         setIsValidSession(true);
+        
+        // Fetch user name from users table
+        if (session.user.id) {
+          const { data: userData } = await supabase
+            .from("users")
+            .select("name")
+            .eq("id", session.user.id)
+            .single();
+          
+          if (userData?.name) {
+            setUserName(userData.name);
+          } else {
+            // Fallback to email if name not found
+            setUserName(session.user.email?.split('@')[0] || "User");
+          }
+        }
       } else {
         toast.error("Invalid or expired reset link");
         navigate("/forgot-password");
@@ -79,14 +96,17 @@ const ResetPassword = () => {
     <div className="min-vh-100 d-flex align-items-center justify-content-center bg-light">
       <div className="card shadow-sm" style={{ width: "100%", maxWidth: "400px" }}>
         <div className="card-body p-4">
-          <h2 className="text-center mb-4">Quote Management</h2>
-          <h5 className="text-center text-muted mb-4">Reset Password</h5>
+          <h2 className="text-center mb-2">Quote Management</h2>
+          {userName && (
+            <p className="text-center text-muted mb-4">
+              Hi <strong>{userName}</strong>, create a new password.
+            </p>
+          )}
+          {!userName && (
+            <h5 className="text-center text-muted mb-4">Reset Password</h5>
+          )}
           
           <form onSubmit={handleSubmit}>
-            <p className="text-muted mb-3">
-              Enter your new password below.
-            </p>
-            
             <div className="mb-3">
               <label className="form-label">New Password</label>
               <input
