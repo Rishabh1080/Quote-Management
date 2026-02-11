@@ -20,6 +20,8 @@ interface QuoteFormProps {
     discount_percent: number;
     additionalItems: AdditionalRow[];
     costDefaults?: Record<string, string>;
+    remarks?: string;
+    notes?: string;
   };
   quoteGroupId?: string;
   sourceQuoteId?: string;
@@ -37,6 +39,8 @@ const QuoteForm = ({ prefill, quoteGroupId, existingQuoteId, renderActions }: Qu
   const [companyId, setCompanyId] = useState(prefill?.company_id || "");
   const [productId, setProductId] = useState(prefill?.product_id || "");
   const [discountPercent, setDiscountPercent] = useState<number | string>(prefill?.discount_percent ?? "");
+  const [remarks, setRemarks] = useState(prefill?.remarks || "");
+  const [notes, setNotes] = useState(prefill?.notes || "");
   const [additionalItems, setAdditionalItems] = useState<AdditionalRow[]>(prefill?.additionalItems || []);
   const [saving, setSaving] = useState(false);
   const [costDefaults, setCostDefaults] = useState<Record<string, string>>(prefill?.costDefaults || {});
@@ -324,6 +328,8 @@ const QuoteForm = ({ prefill, quoteGroupId, existingQuoteId, renderActions }: Qu
             fixed_cost: costDefaults['FIXED'] ? Number(costDefaults['FIXED']) : null,
             man_days_cost: Number(costDefaults['MAN_DAYS']) || 0,
             stay_man_days_cost: Number(costDefaults['STAY_MAN_DAYS']) || 0,
+            remarks: remarks || null,
+            notes: notes || null,
             status_code: statusCode,
             created_by: user?.id || null,
             updated_at: new Date().toISOString(),
@@ -385,6 +391,8 @@ const QuoteForm = ({ prefill, quoteGroupId, existingQuoteId, renderActions }: Qu
           fixed_cost: costDefaults['FIXED'] ? Number(costDefaults['FIXED']) : null,
           man_days_cost: Number(costDefaults['MAN_DAYS']),
           stay_man_days_cost: Number(costDefaults['STAY_MAN_DAYS']),
+          remarks: remarks || null,
+          notes: notes || null,
           created_by: user?.id || null,
         })
         .select()
@@ -580,6 +588,30 @@ const QuoteForm = ({ prefill, quoteGroupId, existingQuoteId, renderActions }: Qu
                 </div>
                 );
               })}
+            </div>
+
+            {/* Remarks */}
+            <div className="mb-3">
+              <label className="form-label">Remarks</label>
+              <textarea
+                className="form-control"
+                rows={2}
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
+                placeholder="Optional remarks"
+              />
+            </div>
+
+            {/* Notes */}
+            <div className="mb-3">
+              <label className="form-label">Notes</label>
+              <textarea
+                className="form-control"
+                rows={2}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Optional notes"
+              />
             </div>
           </div>
         </div>

@@ -62,6 +62,8 @@ const QuoteEdit = () => {
         discount_percent: q.discount_percent,
         additionalItems,
         costDefaults,
+        remarks: q.remarks || "",
+        notes: q.notes || "",
       });
       setLoading(false);
     };

@@ -129,8 +129,10 @@ export type Database = {
           is_latest: boolean
           man_days_cost: number
           net_total: number
+          notes: string | null
           product_id: string
           quote_group_id: string
+          remarks: string | null
           status_code: string
           stay_man_days_cost: number
           subtotal: number
@@ -148,8 +150,10 @@ export type Database = {
           is_latest?: boolean
           man_days_cost?: number
           net_total?: number
+          notes?: string | null
           product_id: string
           quote_group_id: string
+          remarks?: string | null
           status_code: string
           stay_man_days_cost?: number
           subtotal?: number
@@ -167,8 +171,10 @@ export type Database = {
           is_latest?: boolean
           man_days_cost?: number
           net_total?: number
+          notes?: string | null
           product_id?: string
           quote_group_id?: string
+          remarks?: string | null
           status_code?: string
           stay_man_days_cost?: number
           subtotal?: number

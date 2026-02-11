@@ -154,6 +154,25 @@ const QuoteDetails = ({ onQuoteLoaded }: QuoteDetailsPageProps) => {
             </div>
           </div>
 
+          {(quote.remarks || quote.notes) && (
+            <div className="card mb-3">
+              <div className="card-body">
+                {quote.remarks && (
+                  <div className="mb-2">
+                    <strong>Remarks:</strong>
+                    <p className="mb-0 mt-1">{quote.remarks}</p>
+                  </div>
+                )}
+                {quote.notes && (
+                  <div className={quote.remarks ? "mt-3" : ""}>
+                    <strong>Notes:</strong>
+                    <p className="mb-0 mt-1">{quote.notes}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="card mb-3">
             <div className="card-header fw-semibold">Line Items</div>
             <div className="table-responsive">
