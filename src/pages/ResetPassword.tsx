@@ -68,7 +68,17 @@ const ResetPassword = () => {
         password: password,
       });
 
-      if (error) throw error;
+      if (error) {
+        // Check if error is about same password
+        if (error.message.toLowerCase().includes("same") || 
+            error.message.toLowerCase().includes("new password should be different")) {
+          toast.error("New password cannot be the same as your old password");
+        } else {
+          toast.error(error.message || "Failed to update password");
+        }
+        setLoading(false);
+        return;
+      }
 
       toast.success("Password updated successfully!");
       
@@ -77,7 +87,6 @@ const ResetPassword = () => {
       navigate("/login");
     } catch (error: any) {
       toast.error(error.message || "Failed to update password");
-    } finally {
       setLoading(false);
     }
   };
