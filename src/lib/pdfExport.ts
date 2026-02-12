@@ -103,7 +103,7 @@ export const generateQuotePDF = (quoteData: QuoteData) => {
     },
     styles: {
       fontSize: 10,
-      cellPadding: 5,
+      cellPadding: 2,
       overflow: 'linebreak',
       valign: 'top',
       lineColor: [200, 200, 200],

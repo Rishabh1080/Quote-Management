@@ -434,7 +434,8 @@ const QuoteForm = ({ prefill, quoteGroupId, existingQuoteId, renderActions }: Qu
     setSaving(true);
     try {
       const lines = calcLineItems();
-      const subtotal = lines.reduce((s, l) => s + l.line_total, 0);
+      const totalInstrumentCost = calcTotalIntegrationCost() + calcTotalHardwareCost();
+      const subtotal = lines.reduce((s, l) => s + l.line_total, 0) + totalInstrumentCost;
       const netTotal = subtotal * (1 - (Number(discountPercent) || 0) / 100);
       const today = new Date().toISOString().slice(0, 10);
 

@@ -55,6 +55,9 @@ const QuoteNewVersion = () => {
       if (sourceQuote.fixed_cost) {
         costDefaults['FIXED'] = String(sourceQuote.fixed_cost);
       }
+      if (sourceQuote.hardware_cost) {
+        costDefaults['HARDWARE'] = String(sourceQuote.hardware_cost);
+      }
 
       const additionalItems = (q.quote_line_items || [])
         .filter((li: any) => li.item_type !== "PRODUCT_BASE")
@@ -67,12 +70,30 @@ const QuoteNewVersion = () => {
           unit_price: Number(li.unit_price),
         }));
 
+      // Fetch instruments from the current quote
+      const { data: instrumentsData } = await supabase
+        .from("instruments")
+        .select("*")
+        .eq("quote_id", q.id)
+        .order("sort_order");
+
+      const instruments = (instrumentsData || []).map((inst: any) => ({
+        instrument_name: inst.instrument_name,
+        quantity: inst.quantity,
+        man_days: inst.man_days,
+        integration_cost: inst.integration_cost,
+        hardware_cost: inst.hardware_cost,
+      }));
+
       setPrefill({
         company_id: q.company_id,
         product_id: q.product_id,
         discount_percent: q.discount_percent,
         additionalItems,
         costDefaults,
+        instruments,
+        remarks: q.remarks || "",
+        notes: q.notes || "",
       });
       setLoading(false);
     };

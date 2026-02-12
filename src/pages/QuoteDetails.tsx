@@ -32,6 +32,7 @@ const QuoteDetails = ({ onQuoteLoaded }: QuoteDetailsPageProps) => {
   const navigate = useNavigate();
   const [quote, setQuote] = useState<any>(null);
   const [lineItems, setLineItems] = useState<any[]>([]);
+  const [instruments, setInstruments] = useState<any[]>([]);
   const [versions, setVersions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -66,6 +67,13 @@ const QuoteDetails = ({ onQuoteLoaded }: QuoteDetailsPageProps) => {
         .order("sort_order");
       setLineItems(items || []);
 
+      const { data: instData } = await supabase
+        .from("instruments")
+        .select("*")
+        .eq("quote_id", q.id)
+        .order("sort_order");
+      setInstruments(instData || []);
+
       if (isInitial) await loadVersions(q.quote_group_id);
     }
     setLoading(false);
@@ -90,6 +98,11 @@ const QuoteDetails = ({ onQuoteLoaded }: QuoteDetailsPageProps) => {
   const handleExportPDF = () => {
     if (!quote) return;
     
+    // Calculate total instrument cost
+    const totalInstrumentCost = instruments.reduce((sum, inst) => 
+      sum + (Number(inst.integration_cost) || 0) + (Number(inst.hardware_cost) || 0), 0
+    );
+    
     const pdfData = {
       company_name: quote.companies?.name || "N/A",
       product_name: quote.products?.name || "N/A",
@@ -105,7 +118,8 @@ const QuoteDetails = ({ onQuoteLoaded }: QuoteDetailsPageProps) => {
         unit_price: Number(item.unit_price),
         line_total: Number(item.line_total),
         item_type: item.item_type
-      }))
+      })),
+      instrument_integration_cost: totalInstrumentCost
     };
     
     generateQuotePDF(pdfData);
@@ -196,19 +210,44 @@ const QuoteDetails = ({ onQuoteLoaded }: QuoteDetailsPageProps) => {
                       <td className="text-end">{fmt(li.line_total)}</td>
                     </tr>
                   ))}
+                  {instruments.length > 0 && (() => {
+                    const totalInstrumentCost = instruments.reduce((sum, inst) => 
+                      sum + (Number(inst.integration_cost) || 0) + (Number(inst.hardware_cost) || 0), 0
+                    );
+                    return (
+                      <tr>
+                        <td>Instrument Integration Cost</td>
+                        <td><small className="text-muted">INSTRUMENT</small></td>
+                        <td className="text-end">1</td>
+                        <td className="text-end">{fmt(totalInstrumentCost)}</td>
+                        <td className="text-end">{fmt(totalInstrumentCost)}</td>
+                      </tr>
+                    );
+                  })()}
                 </tbody>
                 <tfoot>
                   <tr>
                     <td colSpan={4} className="text-end fw-semibold">Subtotal</td>
-                    <td className="text-end fw-semibold">{fmt(quote.subtotal)}</td>
+                    <td className="text-end fw-semibold">{fmt(
+                      lineItems.reduce((sum, li) => sum + Number(li.line_total), 0) +
+                      instruments.reduce((sum, inst) => sum + (Number(inst.integration_cost) || 0) + (Number(inst.hardware_cost) || 0), 0)
+                    )}</td>
                   </tr>
                   <tr>
                     <td colSpan={4} className="text-end">Discount ({quote.discount_percent}%)</td>
-                    <td className="text-end">−{fmt(Number(quote.subtotal) - Number(quote.net_total))}</td>
+                    <td className="text-end">−{fmt(
+                      (lineItems.reduce((sum, li) => sum + Number(li.line_total), 0) +
+                      instruments.reduce((sum, inst) => sum + (Number(inst.integration_cost) || 0) + (Number(inst.hardware_cost) || 0), 0)) *
+                      (Number(quote.discount_percent) / 100)
+                    )}</td>
                   </tr>
                   <tr className="table-dark">
                     <td colSpan={4} className="text-end fw-bold">Net Total</td>
-                    <td className="text-end fw-bold">{fmt(quote.net_total)}</td>
+                    <td className="text-end fw-bold">{fmt(
+                      (lineItems.reduce((sum, li) => sum + Number(li.line_total), 0) +
+                      instruments.reduce((sum, inst) => sum + (Number(inst.integration_cost) || 0) + (Number(inst.hardware_cost) || 0), 0)) *
+                      (1 - Number(quote.discount_percent) / 100)
+                    )}</td>
                   </tr>
                 </tfoot>
               </table>
