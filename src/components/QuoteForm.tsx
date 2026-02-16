@@ -60,6 +60,7 @@ const QuoteForm = ({ prefill, quoteGroupId, existingQuoteId, renderActions }: Qu
   const [discountError, setDiscountError] = useState(false);
   const [companyError, setCompanyError] = useState(false);
   const [productError, setProductError] = useState(false);
+  const [notesError, setNotesError] = useState(false);
 
   const selectedProduct = products.find((p) => p.id === productId);
 
@@ -365,6 +366,12 @@ const QuoteForm = ({ prefill, quoteGroupId, existingQuoteId, renderActions }: Qu
       // Validate Product (mandatory)
       if (!productId) {
         setProductError(true);
+        hasErrors = true;
+      }
+      
+      // Validate Notes (mandatory)
+      if (!notes || notes.trim() === "") {
+        setNotesError(true);
         hasErrors = true;
       }
       
@@ -788,13 +795,16 @@ const QuoteForm = ({ prefill, quoteGroupId, existingQuoteId, renderActions }: Qu
 
             {/* Notes */}
             <div className="mb-3">
-              <label className="form-label">Notes</label>
+              <label className="form-label">Notes *</label>
               <textarea
-                className="form-control"
+                className={`form-control ${notesError ? 'is-invalid' : ''}`}
                 rows={2}
                 value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Optional notes"
+                onChange={(e) => {
+                  setNotes(e.target.value);
+                  if (notesError) setNotesError(false);
+                }}
+                placeholder="Required notes"
               />
             </div>
           </div>
@@ -817,7 +827,7 @@ const QuoteForm = ({ prefill, quoteGroupId, existingQuoteId, renderActions }: Qu
               <>
                 <div className="row g-2 mb-1">
                   <div className="col-sm-3"><small className="text-muted fw-semibold">Instrument Name</small></div>
-                  <div className="col-sm-1"><small className="text-muted fw-semibold">Quantity</small></div>
+                  <div className="col-sm-1"><small className="text-muted fw-semibold">Qty</small></div>
                   <div className="col-sm-1"><small className="text-muted fw-semibold">Man days</small></div>
                   <div className="col-sm-2"><small className="text-muted fw-semibold">Integration Cost</small></div>
                   <div className="col-sm-2"><small className="text-muted fw-semibold">Hardware Cost</small></div>

@@ -53,7 +53,7 @@ const QuoteDetails = ({ onQuoteLoaded }: QuoteDetailsPageProps) => {
 
     const { data: q } = await supabase
       .from("quotes")
-      .select("*, companies(name), products(name, base_price), users(name)")
+      .select("*, companies(name), products(name, base_price, description), users(name)")
       .eq("id", id)
       .single();
     setQuote(q);
@@ -95,8 +95,26 @@ const QuoteDetails = ({ onQuoteLoaded }: QuoteDetailsPageProps) => {
     loadVersions(quote.quote_group_id);
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (!quote) return;
+    
+    // Fetch the first version (version 0) to get the creator's user ID
+    const { data: firstVersion } = await supabase
+      .from("quotes")
+      .select("created_by")
+      .eq("quote_group_id", quote.quote_group_id)
+      .eq("version_number", 0)
+      .single();
+    
+    let creatorName = "N/A";
+    if (firstVersion?.created_by) {
+      const { data: userData } = await supabase
+        .from("users")
+        .select("name")
+        .eq("id", firstVersion.created_by)
+        .single();
+      creatorName = userData?.name || "N/A";
+    }
     
     // Calculate total instrument cost
     const totalInstrumentCost = instruments.reduce((sum, inst) => 
@@ -106,11 +124,15 @@ const QuoteDetails = ({ onQuoteLoaded }: QuoteDetailsPageProps) => {
     const pdfData = {
       company_name: quote.companies?.name || "N/A",
       product_name: quote.products?.name || "N/A",
+      product_description: quote.products?.description || "",
       version_label: quote.version_label,
       created_at: quote.created_at,
       discount_percent: quote.discount_percent,
       subtotal: Number(quote.subtotal),
       net_total: Number(quote.net_total),
+      created_by_name: creatorName,
+      notes: quote.notes || "",
+      remarks: quote.remarks || "",
       line_items: lineItems.map(item => ({
         label: item.label,
         description: item.description || "",
@@ -118,6 +140,13 @@ const QuoteDetails = ({ onQuoteLoaded }: QuoteDetailsPageProps) => {
         unit_price: Number(item.unit_price),
         line_total: Number(item.line_total),
         item_type: item.item_type
+      })),
+      instruments: instruments.map(inst => ({
+        instrument_name: inst.instrument_name,
+        quantity: inst.quantity,
+        man_days: inst.man_days,
+        integration_cost: Number(inst.integration_cost),
+        hardware_cost: Number(inst.hardware_cost)
       })),
       instrument_integration_cost: totalInstrumentCost
     };
@@ -188,13 +217,12 @@ const QuoteDetails = ({ onQuoteLoaded }: QuoteDetailsPageProps) => {
           )}
 
           <div className="card mb-3">
-            <div className="card-header fw-semibold">Line Items</div>
+            <div className="card-header fw-semibold">Quotation Summary</div>
             <div className="table-responsive">
               <table className="table table-sm mb-0">
                 <thead>
                   <tr>
                     <th>Item</th>
-                    <th>Type</th>
                     <th className="text-end">Qty</th>
                     <th className="text-end">Unit Price</th>
                     <th className="text-end">Total</th>
@@ -204,7 +232,6 @@ const QuoteDetails = ({ onQuoteLoaded }: QuoteDetailsPageProps) => {
                   {lineItems.map((li) => (
                     <tr key={li.id}>
                       <td>{li.label}</td>
-                      <td><small className="text-muted">{li.item_type}</small></td>
                       <td className="text-end">{li.quantity}</td>
                       <td className="text-end">{fmt(li.unit_price)}</td>
                       <td className="text-end">{fmt(li.line_total)}</td>
@@ -217,7 +244,6 @@ const QuoteDetails = ({ onQuoteLoaded }: QuoteDetailsPageProps) => {
                     return (
                       <tr>
                         <td>Instrument Integration Cost</td>
-                        <td><small className="text-muted">INSTRUMENT</small></td>
                         <td className="text-end">1</td>
                         <td className="text-end">{fmt(totalInstrumentCost)}</td>
                         <td className="text-end">{fmt(totalInstrumentCost)}</td>
@@ -227,14 +253,14 @@ const QuoteDetails = ({ onQuoteLoaded }: QuoteDetailsPageProps) => {
                 </tbody>
                 <tfoot>
                   <tr>
-                    <td colSpan={4} className="text-end fw-semibold">Subtotal</td>
+                    <td colSpan={3} className="text-end fw-semibold">Subtotal</td>
                     <td className="text-end fw-semibold">{fmt(
                       lineItems.reduce((sum, li) => sum + Number(li.line_total), 0) +
                       instruments.reduce((sum, inst) => sum + (Number(inst.integration_cost) || 0) + (Number(inst.hardware_cost) || 0), 0)
                     )}</td>
                   </tr>
                   <tr>
-                    <td colSpan={4} className="text-end">Discount ({quote.discount_percent}%)</td>
+                    <td colSpan={3} className="text-end">Discount ({quote.discount_percent}%)</td>
                     <td className="text-end">−{fmt(
                       (lineItems.reduce((sum, li) => sum + Number(li.line_total), 0) +
                       instruments.reduce((sum, inst) => sum + (Number(inst.integration_cost) || 0) + (Number(inst.hardware_cost) || 0), 0)) *
@@ -242,7 +268,7 @@ const QuoteDetails = ({ onQuoteLoaded }: QuoteDetailsPageProps) => {
                     )}</td>
                   </tr>
                   <tr className="table-dark">
-                    <td colSpan={4} className="text-end fw-bold">Net Total</td>
+                    <td colSpan={3} className="text-end fw-bold">Net Total</td>
                     <td className="text-end fw-bold">{fmt(
                       (lineItems.reduce((sum, li) => sum + Number(li.line_total), 0) +
                       instruments.reduce((sum, inst) => sum + (Number(inst.integration_cost) || 0) + (Number(inst.hardware_cost) || 0), 0)) *
@@ -253,6 +279,51 @@ const QuoteDetails = ({ onQuoteLoaded }: QuoteDetailsPageProps) => {
               </table>
             </div>
           </div>
+
+          {instruments.length > 0 && (
+            <div className="card mb-3">
+              <div className="card-header fw-semibold">Instruments</div>
+              <div className="table-responsive">
+                <table className="table table-sm mb-0">
+                  <thead>
+                    <tr>
+                      <th>Instrument Name</th>
+                      <th className="text-end">Quantity</th>
+                      <th className="text-end">Man Days</th>
+                      <th className="text-end">Integration Cost</th>
+                      <th className="text-end">Hardware Cost</th>
+                      <th className="text-end">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {instruments.map((inst) => {
+                      const rowTotal = (Number(inst.integration_cost) || 0) + (Number(inst.hardware_cost) || 0);
+                      return (
+                        <tr key={inst.id}>
+                          <td>{inst.instrument_name}</td>
+                          <td className="text-end">{inst.quantity}</td>
+                          <td className="text-end">{inst.man_days}</td>
+                          <td className="text-end">{fmt(inst.integration_cost)}</td>
+                          <td className="text-end">{fmt(inst.hardware_cost)}</td>
+                          <td className="text-end">{fmt(rowTotal)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="table-secondary">
+                      <td colSpan={5} className="text-end fw-semibold">Total</td>
+                      <td className="text-end fw-semibold">{fmt(
+                        instruments.reduce((sum, inst) => 
+                          sum + (Number(inst.integration_cost) || 0) + (Number(inst.hardware_cost) || 0), 0
+                        )
+                      )}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          )}
 
           </>
           )}
